@@ -1,0 +1,111 @@
+[
+  {
+    "id": "ac-t",
+    "name": "AC-T (doxorubicin + cyclophosphamide, then paclitaxel)",
+    "diagnosis": "breast-cancer",
+    "cycleCount": 8,
+    "cycleLengthDays": 21,
+    "adminCostPerCycle": 215,
+    "sourceNote": "CMS Medicare Part B Payment Limit File, effective October 1 - December 31, 2026 (ASP methodology based on 2Q26 ASP data). Doses at BSA 1.7 m2.",
+    "adminSourceNote": "Approximate Medicare PFS non-facility allowance for CPT 96413 + 96417 (two sequential infusions). Not from the payment limit file.",
+    "drugs": [
+      {
+        "hcpcs": "J9000",
+        "name": "Doxorubicin HCl",
+        "dosePerCycle": 102,
+        "billingUnit": 10,
+        "paymentLimit": 3.12,
+        "cycles": [1, 2, 3, 4]
+      },
+      {
+        "hcpcs": "J9075",
+        "name": "Cyclophosphamide (NOS)",
+        "dosePerCycle": 1020,
+        "billingUnit": 5,
+        "paymentLimit": 0.692,
+        "cycles": [1, 2, 3, 4]
+      },
+      {
+        "hcpcs": "J9267",
+        "name": "Paclitaxel",
+        "dosePerCycle": 297.5,
+        "billingUnit": 1,
+        "paymentLimit": 0.108,
+        "cycles": [5, 6, 7, 8]
+      }
+    ]
+  },
+  {
+    "id": "folfox",
+    "name": "FOLFOX (oxaliplatin + leucovorin + fluorouracil)",
+    "diagnosis": "colorectal-cancer",
+    "cycleCount": 12,
+    "cycleLengthDays": 14,
+    "adminCostPerCycle": 250,
+    "sourceNote": "CMS Medicare Part B Payment Limit File, effective October 1 - December 31, 2026 (ASP methodology based on 2Q26 ASP data). Doses at BSA 1.7 m2.",
+    "adminSourceNote": "Approximate Medicare PFS non-facility allowance for CPT 96413 + 96415 + 96416 (46-hour infusion pump). Not from the payment limit file.",
+    "drugs": [
+      {
+        "hcpcs": "J9263",
+        "name": "Oxaliplatin",
+        "dosePerCycle": 144.5,
+        "billingUnit": 0.5,
+        "paymentLimit": 0.087
+      },
+      {
+        "hcpcs": "J0643",
+        "name": "Leucovorin calcium",
+        "dosePerCycle": 680,
+        "billingUnit": 1,
+        "paymentLimit": 0.054
+      },
+      {
+        "hcpcs": "J9192",
+        "name": "Fluorouracil",
+        "dosePerCycle": 4760,
+        "billingUnit": 10,
+        "paymentLimit": 0.039
+      }
+    ]
+  },
+  {
+    "id": "tchp",
+    "name": "TCHP (docetaxel + carboplatin + trastuzumab + pertuzumab)",
+    "diagnosis": "breast-cancer",
+    "cycleCount": 6,
+    "cycleLengthDays": 21,
+    "adminCostPerCycle": 420,
+    "sourceNote": "CMS Medicare Part B Payment Limit File, effective October 1 - December 31, 2026 (ASP methodology based on 2Q26 ASP data). Doses at BSA 1.7 m2, weight 70 kg, carboplatin AUC 6. Maintenance dosing; loading doses not modeled.",
+    "adminSourceNote": "Approximate Medicare PFS non-facility allowance for CPT 96413 + 96417 x3 + 96415 (four sequential infusions). Not from the payment limit file.",
+    "drugs": [
+      {
+        "hcpcs": "J9171",
+        "name": "Docetaxel",
+        "dosePerCycle": 127.5,
+        "billingUnit": 1,
+        "paymentLimit": 0.471
+      },
+      {
+        "hcpcs": "J9045",
+        "name": "Carboplatin",
+        "dosePerCycle": 600,
+        "billingUnit": 50,
+        "paymentLimit": 3.101
+      },
+      {
+        "hcpcs": "J9355",
+        "name": "Trastuzumab (excl. biosimilar)",
+        "dosePerCycle": 420,
+        "billingUnit": 10,
+        "paymentLimit": 68.871
+      },
+      {
+        "hcpcs": "J9306",
+        "name": "Pertuzumab",
+        "dosePerCycle": 420,
+        "billingUnit": 1,
+        "paymentLimit": 17.269
+      }
+    ]
+  }
+]
