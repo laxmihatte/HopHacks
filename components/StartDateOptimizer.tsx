@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { defaultWindow, sweepStartDates } from "@/lib/optimizer";
+import { defaultWindow, sweepStartDates, todayIso } from "@/lib/optimizer";
 import { planYearBoundary, planYearOf } from "@/lib/calculator";
 import { InvalidInputError, isValidIsoDate } from "@/lib/validation";
 import type { EstimateInput, Regimen, StartDateOption } from "@/lib/types";
@@ -32,7 +32,11 @@ export default function StartDateOptimizer({
   regimen: Regimen;
   awardCap: number;
 }) {
-  const initial = useMemo(() => defaultWindow(input.startDate), [input.startDate]);
+  const today = useMemo(() => todayIso(), []);
+  const initial = useMemo(
+    () => defaultWindow(input.startDate, today),
+    [input.startDate, today],
+  );
   const [from, setFrom] = useState(initial.from);
   const [to, setTo] = useState(initial.to);
   const [hover, setHover] = useState<number | null>(null);
@@ -65,9 +69,9 @@ export default function StartDateOptimizer({
   }, [sweep, input.planYearStart]);
 
   return (
-    <section className="rule pt-7">
+    <section className="card p-7 sm:p-9">
       <p className="eyebrow">Smart start date</p>
-      <h2 className="display mt-1.5 text-[24px] font-semibold">
+      <h2 className="display mt-1.5 text-[26px] sm:text-[30px]">
         If you have any choice about when to begin
       </h2>
       <p className="mt-2 max-w-[62ch] text-[14px] leading-relaxed text-[var(--ink-2)]">
@@ -81,6 +85,7 @@ export default function StartDateOptimizer({
           <span className="eyebrow">Earliest you could start</span>
           <input
             type="date"
+            min={today}
             className="tnum mt-2 block border-0 border-b border-[var(--rule-strong)] bg-transparent py-1.5 text-[15px]"
             value={from}
             onChange={(e) => setFrom(e.target.value)}
@@ -90,6 +95,7 @@ export default function StartDateOptimizer({
           <span className="eyebrow">Latest you could start</span>
           <input
             type="date"
+            min={today}
             className="tnum mt-2 block border-0 border-b border-[var(--rule-strong)] bg-transparent py-1.5 text-[15px]"
             value={to}
             onChange={(e) => setTo(e.target.value)}
@@ -135,9 +141,15 @@ function Sweep({
   const values = options.map((o) => o.totalPatientPays);
   const lo = Math.min(...values);
   const hi = Math.max(...values);
-  const span = hi - lo || 1;
-  const top = hi + span * 0.18;
-  const bottom = Math.max(0, lo - span * 0.18);
+  // Round the axis outward to a clean step so the labels are readable money.
+  const rough = (hi - lo || hi || 1) / 2;
+  const mag = 10 ** Math.floor(Math.log10(Math.max(rough, 1)));
+  const step = Math.max(
+    1,
+    [1, 2, 2.5, 5, 10].map((m) => m * mag).find((c) => c >= rough) ?? 10 * mag,
+  );
+  const top = Math.ceil((hi + step * 0.25) / step) * step;
+  const bottom = Math.max(0, Math.floor((lo - step * 0.25) / step) * step);
 
   const plotW = W - PAD.left - PAD.right;
   const plotH = H - PAD.top - PAD.bottom;
@@ -154,7 +166,8 @@ function Sweep({
   const chosenIdx = chosen ? idxOf(chosen.startDate) : -1;
   const active = hover !== null ? options[hover] : null;
 
-  const gridValues = [bottom, bottom + (top - bottom) / 2, top];
+  const gridValues: number[] = [];
+  for (let v = bottom; v <= top + 1e-6; v += step) gridValues.push(Math.round(v));
   const worthIt = savingsVsChosen > 0;
 
   return (
@@ -234,8 +247,14 @@ function Sweep({
               <g key={b}>
                 <line x1={x(i)} x2={x(i)} y1={PAD.top - 4} y2={PAD.top + plotH}
                   stroke="var(--ink-2)" strokeWidth={1.5} strokeDasharray="5 4" />
-                <text x={x(i) + 6} y={PAD.top + 6} fontSize={11} fontWeight={600}
-                  fill="var(--ink-2)">
+                <text
+                  x={x(i) + (i > options.length * 0.6 ? -6 : 6)}
+                  y={PAD.top + 6}
+                  textAnchor={i > options.length * 0.6 ? "end" : "start"}
+                  fontSize={11}
+                  fontWeight={600}
+                  fill="var(--ink-2)"
+                >
                   plan year restarts
                 </text>
               </g>
@@ -268,20 +287,20 @@ function Sweep({
 
           {chosenIdx >= 0 && chosenIdx !== cheapestIdx && (
             <circle cx={x(chosenIdx)} cy={y(options[chosenIdx].totalPatientPays)} r={4}
-              fill="var(--paper)" stroke="var(--ink-2)" strokeWidth={2} />
+              fill="var(--card)" stroke="var(--ink-2)" strokeWidth={2} />
           )}
           <circle cx={x(cheapestIdx)} cy={y(cheapest.totalPatientPays)} r={5.5}
-            fill="var(--series-2)" stroke="var(--paper)" strokeWidth={2} />
+            fill="var(--series-2)" stroke="var(--card)" strokeWidth={2} />
 
           {hover !== null && (
             <circle cx={x(hover)} cy={y(options[hover].totalPatientPays)} r={4.5}
-              fill="var(--series-1)" stroke="var(--paper)" strokeWidth={2} />
+              fill="var(--series-1)" stroke="var(--card)" strokeWidth={2} />
           )}
         </svg>
 
         {active && (
           <div
-            className="pointer-events-none absolute z-10 min-w-48 border border-[var(--rule-strong)] bg-[var(--paper)] p-2.5 text-[12px] shadow-sm"
+            className="pointer-events-none absolute z-10 min-w-48 border border-[var(--rule-strong)] bg-[var(--card)] p-2.5 text-[12px] shadow-sm"
             style={{
               left: `${(x(hover!) / W) * 100}%`,
               top: 4,

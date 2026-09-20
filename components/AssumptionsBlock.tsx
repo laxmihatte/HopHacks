@@ -61,9 +61,9 @@ export default function AssumptionsBlock({
   planYearStart: string;
 }) {
   return (
-    <section className="rule pt-7">
+    <section className="card p-7 sm:p-9">
       <p className="eyebrow">Limits of this estimate</p>
-      <h2 className="display mt-1.5 text-[24px] font-semibold">
+      <h2 className="display mt-1.5 text-[26px] sm:text-[30px]">
         What this does not include
       </h2>
       <p className="mt-2 max-w-[62ch] text-[14px] text-[var(--ink-2)]">

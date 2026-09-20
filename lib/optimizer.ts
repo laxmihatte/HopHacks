@@ -115,15 +115,26 @@ export function sweepStartDates(
 
 /**
  * A sensible default window around a chosen start date: four weeks earlier
- * through twelve weeks later, which is wide enough to straddle a plan-year
- * boundary from either side.
+ * through twelve weeks later, wide enough to straddle a plan-year boundary
+ * from either side.
+ *
+ * The window never opens before `today`. A date in the past is not a choice
+ * the patient has, and recommending one would be worse than useless.
  */
-export function defaultWindow(startDate: string): { from: string; to: string } {
+export function defaultWindow(
+  startDate: string,
+  today?: string,
+): { from: string; to: string } {
   const t = parseIsoUtc(startDate);
-  return {
-    from: toIsoUtc(t - 28 * MS_PER_DAY),
-    to: toIsoUtc(t + 84 * MS_PER_DAY),
-  };
+  const earliest = t - 28 * MS_PER_DAY;
+  const floor = today ? parseIsoUtc(today) : earliest;
+  const from = Math.max(earliest, Math.min(floor, t));
+  return { from: toIsoUtc(from), to: toIsoUtc(t + 84 * MS_PER_DAY) };
+}
+
+/** Today in UTC, as yyyy-mm-dd. */
+export function todayIso(): string {
+  return toIsoUtc(Date.now());
 }
 
 /** The last cycle date for a regimen started on `startDate`. */

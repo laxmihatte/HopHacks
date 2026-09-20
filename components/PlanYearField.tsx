@@ -53,7 +53,8 @@ export default function PlanYearField({
       <label className="block">
         <span className="eyebrow">Where your coverage comes from</span>
         <select
-          className="mt-2 w-full border-0 border-b border-[var(--rule-strong)] bg-transparent py-1.5 text-[15px] text-[var(--ink)]"
+          aria-label="Where your coverage comes from"
+          className="mt-2 w-full rounded-[var(--radius-field)] border border-[var(--rule-strong)] bg-[var(--card)] px-3.5 py-2.5 text-[15px] text-[var(--ink)]"
           value={coverage}
           onChange={(e) => {
             const next = PROFILES.find((p) => p.id === e.target.value)!;
@@ -76,7 +77,7 @@ export default function PlanYearField({
         <div className="mt-2 flex items-end gap-3">
           <select
             aria-label="Plan year start month"
-            className="flex-1 border-0 border-b border-[var(--rule-strong)] bg-transparent py-1.5 text-[15px] text-[var(--ink)]"
+            className="flex-1 rounded-[var(--radius-field)] border border-[var(--rule-strong)] bg-[var(--card)] px-3.5 py-2.5 text-[15px] text-[var(--ink)]"
             value={month}
             onChange={(e) => setMonthDay(Number(e.target.value), day)}
           >
@@ -94,7 +95,7 @@ export default function PlanYearField({
             step={1}
             inputMode="numeric"
             aria-invalid={error ? true : undefined}
-            className="tnum w-16 border-0 border-b border-[var(--rule-strong)] bg-transparent py-1.5 text-[15px] text-[var(--ink)]"
+            className="tnum w-20 rounded-[var(--radius-field)] border border-[var(--rule-strong)] bg-[var(--card)] px-3.5 py-2.5 text-[15px] text-[var(--ink)]"
             value={day}
             onChange={(e) => setMonthDay(month, Number(e.target.value))}
           />
@@ -121,7 +122,7 @@ export default function PlanYearField({
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
-          className="mt-2 text-[13px] font-medium text-[var(--accent)] underline underline-offset-2"
+          className="mt-2.5 text-[13px] font-medium text-[var(--accent)] underline underline-offset-2"
           aria-expanded={open}
         >
           {open ? "Hide" : "Where do I find this?"}

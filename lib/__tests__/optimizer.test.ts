@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_CANDIDATES, defaultWindow, sweepStartDates } from "../optimizer";
+import { MAX_CANDIDATES, defaultWindow, sweepStartDates, todayIso } from "../optimizer";
 import { estimate } from "../calculator";
 import { InvalidInputError } from "../validation";
 import type { EstimateInput, Regimen } from "../types";
@@ -128,7 +128,25 @@ describe("the sweep refuses input it cannot price", () => {
 });
 
 describe("the default window straddles the chosen date", () => {
-  it("reaches back four weeks and forward twelve", () => {
-    expect(defaultWindow("2026-10-15")).toEqual({ from: "2026-09-17", to: "2027-01-07" });
+  it("reaches back four weeks and forward twelve when all of it is in the future", () => {
+    expect(defaultWindow("2026-10-15", "2026-08-01")).toEqual({
+      from: "2026-09-17",
+      to: "2027-01-07",
+    });
+  });
+
+  it("never opens before today — a past date is not a choice the patient has", () => {
+    // Four weeks before Oct 15 is Sep 17, which is already gone on Sep 19.
+    expect(defaultWindow("2026-10-15", "2026-09-19").from).toBe("2026-09-19");
+  });
+
+  it("does not push the window past the chosen date when today is later", () => {
+    const w = defaultWindow("2026-10-15", "2026-12-25");
+    expect(w.from).toBe("2026-10-15");
+    expect(w.to).toBe("2027-01-07");
+  });
+
+  it("reports today as a real ISO date", () => {
+    expect(todayIso()).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 });

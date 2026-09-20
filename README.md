@@ -11,7 +11,7 @@ Requirements* (2026-09-19).
 
 ```bash
 npm install
-npm test          # 65 tests — engine, matcher, validation, data integrity
+npm test          # 98 tests — engine, plan year, optimizer, matcher, validation, data
 npm run dev       # http://localhost:3000
 ```
 
@@ -57,6 +57,43 @@ Beats: state the problem → enter inputs live → land on the chart and point a
 January step → point at the gap between the curves → name a limitation before being
 asked → close on the navigator pilot.
 
+## The plan year is not always January 1
+
+Almost every cost tool hardcodes a January 1 reset. That is correct for Medicare and for
+marketplace plans, which are regulated to the calendar year — but an **employer** plan
+follows the *employer's* benefit year, and July 1 and October 1 are both common. The
+insurance company's name tells you nothing about it: the same insurer resets in January
+for one member and July for another.
+
+It is not a footnote. On the demo input, the boundary alone is the difference between
+**$15,665 and $9,000** for identical treatment:
+
+| Plan year starts | Patient pays | Why |
+|---|---|---|
+| January 1 | $15,665 | Treatment crosses the boundary; deductible and OOP max charged twice |
+| July 1 | $9,000 | The same October–February course never crosses a July boundary |
+
+`data/plan-years.json` holds seven coverage profiles with what is *regulated*, what is
+merely *common*, and what genuinely *varies* — plus where to look it up. It never asserts
+a reset date it cannot know; for an employer plan it tells you to ask HR.
+
+## Smart start date
+
+If the oncologist allows any window, the cheapest day to begin is worth real money. The
+optimizer prices **every candidate date** in the window with the same engine the main
+estimate uses — each point on the curve is a full cycle-by-cycle simulation, so there is
+nothing to approximate and nothing to hallucinate.
+
+On the demo input it finds **January 1, 2027, saving $6,665** against an October 15 start.
+
+Three rules keep it honest:
+
+- **Ties go to the earliest date.** Delaying treatment carries clinical risk this tool
+  does not model, so it never recommends a later date for the same money.
+- **The window never opens in the past.** A date that has already gone is not a choice.
+- **It is a solver, not a model.** `lib/optimizer.ts` is a deterministic sweep; the tests
+  assert every point matches a direct `estimate()` call exactly.
+
 ## Architecture
 
 Next.js app router, Tailwind, TypeScript. Everything client-side. No database, no auth,
@@ -64,10 +101,13 @@ no API layer, no runtime fetching — the three data files are imported at build
 
 ```
 lib/calculator.ts   gross cost, patient share, plan-year reset, cycle schedule
+lib/optimizer.ts    start-date sweep — prices every candidate date
 lib/matcher.ts      FPL percentage, eligibility filter, ranking, aid application
+lib/validation.ts   field rules shared by the form and the engine
+lib/url.ts          form state <-> query string, so links and Back/Forward work
 lib/types.ts        shared interfaces
 components/*        everything visual
-data/*.json         regimens, programs, poverty guidelines
+data/*.json         regimens, programs, poverty guidelines, plan-year profiles
 ```
 
 The two `lib` modules import nothing from React. That rule is what makes the test suite
@@ -87,11 +127,11 @@ a flat administration figure. The ceiling is load-bearing: drugs bill in whole u
 partial unit rounds up.
 
 **Plan-year reset.** Before applying a cycle, if its date falls in a later plan year than
-the previous cycle, both accumulators are zeroed. This is the differentiator — most cost
-calculators ignore it, and it is the single largest controllable swing in a patient's
-total cost. A patient starting TCHP in October pays $15,665; the same patient starting in
-February pays $9,000. Identical diagnosis, identical regimen, $6,665 of difference from
-the calendar alone.
+the previous cycle, both accumulators are zeroed. The boundary is configurable, not
+assumed. This is the differentiator — most cost calculators ignore it, and it is the
+single largest controllable swing in a patient's total cost. A patient starting TCHP in
+October pays $15,665; the same patient starting January 1 pays $9,000. Identical
+diagnosis, identical regimen, $6,665 of difference from the calendar alone.
 
 Dates are handled in UTC throughout, so a browser timezone can never shift a cycle across
 the boundary.
@@ -151,7 +191,7 @@ All P0 and P1 requirements ship. P2 was abandoned as planned.
 | FR-10 – FR-12 | Cost chart, after-aid overlay, reset marked | ✅ |
 | FR-13 – FR-14 | Program cards with `lastVerified`, persistent disclaimer | ✅ |
 | FR-15 – FR-17 | Cycle table, ranking, insurance-type selector | ✅ (P1) |
-| FR-18 – FR-20 | Delay-start toggle, shareable URL, third regimen | FR-20 shipped; FR-18/19 cut (P2) |
+| FR-18 – FR-20 | Delay-start toggle, shareable URL, third regimen | **all three shipped** — FR-18 became the start-date optimizer |
 
 | | Success criterion | Status |
 |---|---|---|

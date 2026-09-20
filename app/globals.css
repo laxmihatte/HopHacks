@@ -1,71 +1,92 @@
 @import "tailwindcss";
 
 /*
- * Ink on paper. Surfaces are warm and few; structure comes from hairline rules
- * and whitespace rather than stacked cards. Series colours are unchanged —
- * they are a validated categorical pair and are not a matter of taste.
+ * Soft-light surface: a faintly green-grey field carrying a fine grain and a
+ * diffuse glow, with white cards floating on it.
+ *
+ * The two chart series stay blue/orange. That pair is validated for colour
+ * vision deficiency; the obvious blue/green alternative collapses to a tritan
+ * separation of 4.0, and data encoding is not a branding decision.
  */
 :root {
   color-scheme: light;
 
-  --paper: #fbfaf7;
-  --paper-sunk: #f3f1ea;
-  --ink: #1a1a18;
-  --ink-2: #55534b;
-  --ink-3: #85827a;
-  --rule: #e0dcd2;
-  --rule-strong: #c4c0b4;
+  --field: #f6f5f1;
+  --card: #ffffff;
+  --sunk: #faf9f6;
 
-  --accent: #1c4f8f;
+  --ink: #0d0d0d;
+  --ink-2: #4a4b4c;
+  --ink-3: #7c7e80;
+
+  --rule: #e7e5df;
+  --rule-strong: #d3d0c9;
+
+  --accent: #2b5278;
   --accent-ink: #ffffff;
+  --accent-soft: #eaf0f7;
+
+  --glow-a: rgba(124, 163, 204, 0.42);
+  --glow-b: rgba(160, 190, 222, 0.34);
 
   --series-1: #2a78d6;
   --series-2: #eb6834;
-  --grid: #e9e5dc;
+  --grid: #eceae4;
 
-  --flag-bg: #f7efdc;
-  --flag-rule: #ddc79a;
-  --flag-ink: #5b4610;
+  --flag-bg: #eef2f8;
+  --flag-rule: #cfdcea;
+  --flag-ink: #2b4661;
+
+  --radius-card: 26px;
+  --radius-field: 12px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --paper: #14140f;
-    --paper-sunk: #1d1c16;
-    --ink: #f6f4ec;
-    --ink-2: #b8b5a8;
-    --ink-3: #8a877c;
-    --rule: #32302a;
-    --rule-strong: #4a4740;
-    --accent: #7fb0f0;
-    --accent-ink: #14140f;
+    --field: #111312;
+    --card: #191b1c;
+    --sunk: #1f2223;
+    --ink: #f4f4f3;
+    --ink-2: #aeb0b1;
+    --ink-3: #7e8081;
+    --rule: #292c2d;
+    --rule-strong: #3c4041;
+    --accent: #9cc4e8;
+    --accent-ink: #0a1119;
+    --accent-soft: #17222d;
+    --glow-a: rgba(58, 98, 140, 0.44);
+    --glow-b: rgba(44, 76, 110, 0.36);
     --series-1: #3987e5;
     --series-2: #d95926;
-    --grid: #2a2823;
-    --flag-bg: #2a2209;
-    --flag-rule: #574616;
-    --flag-ink: #efd79c;
+    --grid: #242728;
+    --flag-bg: #17222d;
+    --flag-rule: #2d4258;
+    --flag-ink: #b4d3ef;
   }
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --paper: #14140f;
-  --paper-sunk: #1d1c16;
-  --ink: #f6f4ec;
-  --ink-2: #b8b5a8;
-  --ink-3: #8a877c;
-  --rule: #32302a;
-  --rule-strong: #4a4740;
-  --accent: #7fb0f0;
-  --accent-ink: #14140f;
+  --field: #111312;
+  --card: #191b1c;
+  --sunk: #1f2223;
+  --ink: #f4f4f3;
+  --ink-2: #aeb0b1;
+  --ink-3: #7e8081;
+  --rule: #292c2d;
+  --rule-strong: #3c4041;
+  --accent: #9cc4e8;
+  --accent-ink: #0a1119;
+  --accent-soft: #17222d;
+  --glow-a: rgba(58, 98, 140, 0.44);
+  --glow-b: rgba(44, 76, 110, 0.36);
   --series-1: #3987e5;
   --series-2: #d95926;
-  --grid: #2a2823;
-  --flag-bg: #2a2209;
-  --flag-rule: #574616;
-  --flag-ink: #efd79c;
+  --grid: #242728;
+  --flag-bg: #17222d;
+  --flag-rule: #2d4258;
+  --flag-ink: #b4d3ef;
 }
 
 html {
@@ -73,38 +94,84 @@ html {
 }
 
 body {
-  background: var(--paper);
+  position: relative;
+  min-height: 100vh;
+  background-color: var(--field);
   color: var(--ink);
   font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
   font-size: 15px;
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
 }
 
-/* Display face for headings and every figure that carries the answer. */
+/* Fine grain over the whole field, so the flat colour has some tooth. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.5;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='160' height='160' filter='url(%23n)' opacity='0.42'/></svg>");
+}
+
+/* The diffuse glow behind the masthead. */
+.glow {
+  position: absolute;
+  inset-inline: 0;
+  top: -180px;
+  height: 620px;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(52% 58% at 50% 62%, var(--glow-a) 0%, transparent 70%),
+    radial-gradient(38% 46% at 68% 42%, var(--glow-b) 0%, transparent 72%);
+  filter: blur(18px);
+}
+
+/*
+ * Everything that is not the field sits above the grain.
+ *
+ * Only z-index — this class must never set `position`, or it silently
+ * overrides Tailwind's `sticky` on any element that carries both.
+ */
+.layer {
+  z-index: 1;
+}
+
+/* Non-sticky containers still need a stacking context to clear the grain. */
+.layer:not(.sticky) {
+  position: relative;
+}
+
+/* Display type: tight, large, near-black — the reference's voice. */
 .display {
-  font-family: var(--font-serif), Georgia, "Times New Roman", serif;
-  font-optical-sizing: auto;
-  letter-spacing: -0.012em;
+  letter-spacing: -0.033em;
+  line-height: 1.04;
+  font-weight: 600;
 }
 
-/* Money and dates line up in columns. */
 .tnum {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1;
 }
 
-/* The small letterspaced label that opens each section. */
 .eyebrow {
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.09em;
+  letter-spacing: 0.11em;
   text-transform: uppercase;
   color: var(--ink-3);
 }
 
-/* One hairline, used everywhere a box would otherwise appear. */
+/* The floating white panel. */
+.card {
+  background: var(--card);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-card);
+  box-shadow: 0 1px 2px rgba(20, 30, 24, 0.04), 0 12px 32px -18px rgba(20, 40, 30, 0.18);
+}
+
 .rule {
   border-top: 1px solid var(--rule);
 }
@@ -116,7 +183,7 @@ a {
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
-  border-radius: 1px;
+  border-radius: 3px;
 }
 
 .sr-only {

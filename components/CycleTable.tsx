@@ -25,9 +25,9 @@ export default function CycleTable({
   hasAid: boolean;
 }) {
   return (
-    <section className="rule pt-7">
+    <section className="card p-7 sm:p-9">
       <p className="eyebrow">The arithmetic</p>
-      <h2 className="display mt-1.5 mb-5 text-[24px] font-semibold">
+      <h2 className="display mt-1.5 mb-6 text-[26px] sm:text-[30px]">
         Cycle by cycle
       </h2>
       <div className="-mx-6 overflow-x-auto px-6">

@@ -276,7 +276,7 @@ export default function CostChart({
           <path d={beforePath} fill="none" stroke="var(--series-1)" strokeWidth={2} />
           {hasAid && (
             <>
-              <path d={afterPath} fill="none" stroke="var(--paper)" strokeWidth={4} />
+              <path d={afterPath} fill="none" stroke="var(--card)" strokeWidth={4} />
               <path d={afterPath} fill="none" stroke="var(--series-2)" strokeWidth={2} />
             </>
           )}
@@ -289,7 +289,7 @@ export default function CostChart({
                 cy={y(cycles[hover].cumulativePatientPays)}
                 r={5}
                 fill="var(--series-1)"
-                stroke="var(--paper)"
+                stroke="var(--card)"
                 strokeWidth={2}
               />
               {hasAid && (
@@ -298,7 +298,7 @@ export default function CostChart({
                   cy={y(afterAidCumulative[hover])}
                   r={5}
                   fill="var(--series-2)"
-                  stroke="var(--paper)"
+                  stroke="var(--card)"
                   strokeWidth={2}
                 />
               )}
@@ -323,7 +323,7 @@ export default function CostChart({
 
         {active && (
           <div
-            className="pointer-events-none absolute z-10 min-w-44 border border-[var(--rule-strong)] bg-[var(--paper)] p-2.5 text-xs shadow-sm"
+            className="pointer-events-none absolute z-10 min-w-44 border border-[var(--rule-strong)] bg-[var(--card)] p-2.5 text-xs shadow-sm"
             style={{
               left: `${(x(hover!) / W) * 100}%`,
               top: "17%",

@@ -6,9 +6,9 @@ const money = (n: number) =>
 export default function ProgramList({ aid }: { aid: AidResult }) {
   if (aid.matched.length === 0) {
     return (
-      <section className="rule pt-7">
+      <section className="card p-7 sm:p-9">
         <p className="eyebrow">Assistance</p>
-        <h2 className="display mt-1.5 text-[24px] font-semibold">
+        <h2 className="display mt-1.5 text-[26px] sm:text-[30px]">
           Assistance programs
         </h2>
         <p className="mt-2 text-[13px] leading-relaxed text-[var(--ink-2)]">
@@ -25,11 +25,11 @@ export default function ProgramList({ aid }: { aid: AidResult }) {
   }
 
   return (
-    <section className="rule pt-7">
+    <section className="card p-7 sm:p-9">
       <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
         <div>
           <p className="eyebrow">Assistance</p>
-          <h2 className="display mt-1.5 text-[24px] font-semibold">
+          <h2 className="display mt-1.5 text-[26px] sm:text-[30px]">
             {aid.matched.length} {aid.matched.length === 1 ? "program" : "programs"} this
             household may qualify for
           </h2>

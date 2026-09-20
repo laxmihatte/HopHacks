@@ -134,12 +134,13 @@ export default function Page() {
   const crosses = !!ok && ok.est.cycles.some((c) => c.planYearReset);
 
   return (
-    <div className="min-h-screen">
-      <div className="sticky top-0 z-30 bg-[var(--paper)]">
+    <div className="relative min-h-screen">
+      <div className="glow" aria-hidden="true" style={ok ? { opacity: 0.45 } : undefined} />
+      <div className="layer sticky top-0 z-30 backdrop-blur-sm">
         <DisclaimerBanner />
         {ok && (
-          <div className="border-b border-[var(--rule)] bg-[var(--paper-sunk)]">
-            <div className="mx-auto flex max-w-[64rem] flex-wrap items-center gap-x-6 gap-y-1.5 px-6 py-2.5 text-[13px]">
+          <div className="border-b border-[var(--rule)] bg-[var(--card)]/85">
+            <div className="mx-auto flex max-w-[68rem] flex-wrap items-center gap-x-6 gap-y-1.5 px-6 py-2.5 text-[13px]">
               <span className="font-medium">{ok.regimen.name.split(" (")[0]}</span>
               <span className="tnum hidden text-[var(--ink-2)] sm:inline">
                 {ok.regimen.cycleCount} cycles from {submitted!.startDate}
@@ -154,7 +155,7 @@ export default function Page() {
               <button
                 type="button"
                 onClick={() => show(null)}
-                className="ml-auto border border-[var(--rule-strong)] px-3 py-1 text-[13px] font-medium hover:bg-[var(--paper)]"
+                className="ml-auto rounded-full border border-[var(--rule-strong)] bg-[var(--card)] px-3.5 py-1 text-[13px] font-medium hover:bg-[var(--sunk)]"
               >
                 Change inputs
               </button>
@@ -163,24 +164,35 @@ export default function Page() {
         )}
       </div>
 
-      <main className="mx-auto max-w-[64rem] px-6 pb-20">
-        <header className="pt-10 pb-7">
-          <p className="eyebrow">Cost of care</p>
-          <h1 className="display mt-2 max-w-[20ch] text-[34px] font-semibold leading-[1.12] sm:text-[42px]">
-            What cancer treatment will actually cost you
-          </h1>
-          <p className="mt-4 max-w-[58ch] text-[15px] leading-relaxed text-[var(--ink-2)]">
-            Cycle by cycle, from published Medicare payment limits — plus the assistance
-            programs your household already qualifies for, and the cheapest day to begin.
-          </p>
-        </header>
+      <main className="layer mx-auto max-w-[68rem] px-5 pb-20 sm:px-6">
+        {/* Full masthead while choosing; compact once the answer is on screen,
+            so the numbers are not pushed below the fold. */}
+        {ok ? (
+          <header className="pt-8 pb-6">
+            <p className="eyebrow">Cost of care</p>
+            <h1 className="display mt-2 text-[26px] sm:text-[32px]">
+              Your estimate
+            </h1>
+          </header>
+        ) : (
+          <header className="pt-14 pb-12 text-center">
+            <p className="eyebrow">Cost of care</p>
+            <h1 className="display mx-auto mt-4 max-w-[17ch] text-[40px] sm:text-[58px] lg:text-[66px]">
+              What cancer treatment will actually cost you
+            </h1>
+            <p className="mx-auto mt-6 max-w-[56ch] text-[16px] leading-relaxed text-[var(--ink-2)]">
+              Cycle by cycle, from published Medicare payment limits — plus the assistance
+              programs your household already qualifies for, and the cheapest day to begin.
+            </p>
+          </header>
+        )}
 
         {ok ? (
-          <div role="region" aria-live="polite" aria-label="Your cost estimate">
-            <section className="rule grid gap-x-10 gap-y-7 pt-7 sm:grid-cols-2">
+          <div role="region" aria-live="polite" aria-label="Your cost estimate" className="space-y-5">
+            <section className="card grid gap-x-10 gap-y-7 p-7 sm:grid-cols-2 sm:p-9">
               <div>
                 <p className="eyebrow">Your cost before aid</p>
-                <p className="display tnum mt-1.5 text-[46px] font-semibold leading-none">
+                <p className="display tnum mt-2 text-[52px]">
                   {money(ok.est.totalPatientPays)}
                 </p>
                 <p className="tnum mt-2 text-[14px] text-[var(--ink-2)]">
@@ -190,7 +202,7 @@ export default function Page() {
               <div className="sm:border-l sm:border-[var(--rule)] sm:pl-10">
                 <p className="eyebrow">Your cost after aid</p>
                 <p
-                  className="display tnum mt-1.5 text-[46px] font-semibold leading-none"
+                  className="display tnum mt-2 text-[52px]"
                   style={{ color: hasAid ? "var(--series-2)" : undefined }}
                 >
                   {money(ok.aid.totalAfterAid)}
@@ -203,7 +215,7 @@ export default function Page() {
               </div>
             </section>
 
-            <section className="rule pt-7">
+            <section className="card mt-5 p-7 sm:p-9">
               <CostChart
                 estimate={ok.est}
                 afterAidCumulative={ok.aid.afterAidCumulative}
@@ -248,6 +260,7 @@ export default function Page() {
                 {result.error} Adjust the inputs below and try again.
               </div>
             )}
+            <div className="card p-6 sm:p-9">
             <InputForm
               value={form}
               onChange={setForm}
@@ -257,6 +270,7 @@ export default function Page() {
               regimens={REGIMENS}
               errors={errors}
             />
+            </div>
           </>
         )}
       </main>

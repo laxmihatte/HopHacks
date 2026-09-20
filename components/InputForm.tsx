@@ -19,7 +19,7 @@ const INSURANCE_TYPES: { value: InsuranceType; label: string }[] = [
 ];
 
 const field =
-  "mt-2 w-full border-0 border-b border-[var(--rule-strong)] bg-transparent py-1.5 text-[15px] text-[var(--ink)] placeholder:text-[var(--ink-3)]";
+  "mt-2 w-full rounded-[var(--radius-field)] border border-[var(--rule-strong)] bg-[var(--card)] px-3.5 py-2.5 text-[15px] text-[var(--ink)] placeholder:text-[var(--ink-3)]";
 
 function Err({ message }: { message?: string }) {
   if (!message) return null;
@@ -32,19 +32,31 @@ function Err({ message }: { message?: string }) {
 
 function Section({
   n,
+  eyebrow,
   title,
+  last,
   children,
 }: {
-  n: string;
+  n: number;
+  eyebrow: string;
   title: string;
+  last?: boolean;
   children: React.ReactNode;
 }) {
   return (
-    <section className="rule pt-6">
-      <h2 className="display mb-5 flex items-baseline gap-3 text-[19px] font-semibold">
-        <span className="tnum text-[13px] font-normal text-[var(--ink-3)]">{n}</span>
-        {title}
-      </h2>
+    <section className="relative pl-0 sm:pl-16">
+      {/* Step rail — circled number with a connector running to the next step. */}
+      <div className="absolute left-0 top-0 hidden h-full w-12 sm:block" aria-hidden="true">
+        <span className="tnum flex h-10 w-10 items-center justify-center rounded-full border border-[var(--rule-strong)] bg-[var(--card)] text-[14px] font-medium text-[var(--ink-2)]">
+          {n}
+        </span>
+        {!last && (
+          <span className="absolute left-5 top-11 block w-px bg-[var(--rule)]" style={{ height: "calc(100% - 2.75rem)" }} />
+        )}
+      </div>
+
+      <p className="eyebrow">{eyebrow}</p>
+      <h2 className="display mt-1.5 mb-6 text-[26px] sm:text-[30px]">{title}</h2>
       {children}
     </section>
   );
@@ -77,17 +89,18 @@ export default function InputForm({
   return (
     <form
       noValidate
-      className="space-y-8"
+      className="space-y-12"
       onSubmit={(e) => {
         e.preventDefault();
         if (!blocked) onSubmit();
       }}
     >
-      <Section n="01" title="Treatment">
+      <Section n={1} eyebrow="Your treatment" title="What you are being treated for">
         <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-4">
           <label className="block">
             <span className="eyebrow">Diagnosis</span>
             <select
+              aria-label="Diagnosis"
               className={field}
               value={value.diagnosis}
               onChange={(e) => {
@@ -111,6 +124,7 @@ export default function InputForm({
           <label className="block lg:col-span-2">
             <span className="eyebrow">Regimen</span>
             <select
+              aria-label="Regimen"
               className={field}
               value={value.regimenId}
               onChange={(e) => set("regimenId", e.target.value)}
@@ -131,6 +145,7 @@ export default function InputForm({
               max={`${MAX_YEAR}-12-31`}
               aria-invalid={errors.startDate ? true : undefined}
               className={`${field} tnum`}
+              aria-label="Treatment starts"
               value={value.startDate}
               onChange={(e) => set("startDate", e.target.value)}
             />
@@ -139,7 +154,7 @@ export default function InputForm({
         </div>
       </Section>
 
-      <Section n="02" title="Insurance">
+      <Section n={2} eyebrow="Your plan" title="What your insurance charges you">
         <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <span className="eyebrow">Coverage type</span>
@@ -166,6 +181,7 @@ export default function InputForm({
               type="number" min={0} step="any" inputMode="decimal"
               aria-invalid={errors.deductible ? true : undefined}
               className={`${field} tnum`}
+              aria-label="Deductible"
               value={value.deductible}
               onChange={(e) => set("deductible", e.target.value)}
             />
@@ -178,6 +194,7 @@ export default function InputForm({
               type="number" min={0} max={100} step="any" inputMode="decimal"
               aria-invalid={errors.coinsurancePercent ? true : undefined}
               className={`${field} tnum`}
+              aria-label="Coinsurance percent"
               value={value.coinsurancePercent}
               onChange={(e) => set("coinsurancePercent", e.target.value)}
             />
@@ -190,6 +207,7 @@ export default function InputForm({
               type="number" min={0} step="any" inputMode="decimal"
               aria-invalid={errors.oopMax ? true : undefined}
               className={`${field} tnum`}
+              aria-label="Out-of-pocket max"
               value={value.oopMax}
               onChange={(e) => set("oopMax", e.target.value)}
             />
@@ -197,7 +215,7 @@ export default function InputForm({
           </label>
         </div>
 
-        <div className="mt-7 border-l-2 border-[var(--rule-strong)] pl-5">
+        <div className="mt-7 rounded-[18px] border border-[var(--rule)] bg-[var(--sunk)] p-5">
           <PlanYearField
             coverage={value.coverage}
             planYearStart={value.planYearStart}
@@ -207,7 +225,7 @@ export default function InputForm({
         </div>
       </Section>
 
-      <Section n="03" title="Household">
+      <Section n={3} eyebrow="Your household" title="Who the cost has to support" last>
         <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-4">
           <label className="block">
             <span className="eyebrow">People in household</span>
@@ -215,6 +233,7 @@ export default function InputForm({
               type="number" min={1} max={MAX_HOUSEHOLD} step={1} inputMode="numeric"
               aria-invalid={errors.householdSize ? true : undefined}
               className={`${field} tnum`}
+              aria-label="People in household"
               value={value.householdSize}
               onChange={(e) => set("householdSize", e.target.value)}
             />
@@ -227,6 +246,7 @@ export default function InputForm({
               type="number" min={0} step="any" inputMode="decimal"
               aria-invalid={errors.income ? true : undefined}
               className={`${field} tnum`}
+              aria-label="Annual household income"
               value={value.income}
               onChange={(e) => set("income", e.target.value)}
             />
@@ -235,11 +255,11 @@ export default function InputForm({
         </div>
       </Section>
 
-      <div className="rule flex flex-wrap items-center gap-x-6 gap-y-3 pt-6">
+      <div className="rule flex flex-wrap items-center gap-x-4 gap-y-3 pt-7 sm:pl-16">
         <button
           type="submit"
           disabled={blocked}
-          className="bg-[var(--accent)] px-6 py-2.5 text-[14px] font-medium text-[var(--accent-ink)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+          className="rounded-full bg-[var(--accent)] px-6 py-3 text-[14px] font-medium text-[var(--accent-ink)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
         >
           Estimate my cost
         </button>
@@ -247,11 +267,11 @@ export default function InputForm({
           type="reset"
           disabled={!canReset}
           onClick={onReset}
-          className="text-[14px] font-medium text-[var(--ink-2)] underline underline-offset-4 disabled:cursor-not-allowed disabled:opacity-40 disabled:no-underline"
+          className="rounded-full border border-[var(--rule-strong)] px-5 py-3 text-[14px] font-medium text-[var(--ink-2)] hover:bg-[var(--sunk)] disabled:cursor-not-allowed disabled:opacity-40"
         >
           Reset
         </button>
-        <span className="text-[13px] text-[var(--ink-3)]">
+        <span className="ml-1 text-[13px] text-[var(--ink-3)]">
           {blocked
             ? "Fix the highlighted fields to continue."
             : "Nothing you type leaves your browser."}
