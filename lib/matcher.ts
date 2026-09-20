@@ -2,6 +2,7 @@
 // Imports nothing from React.
 
 import type { AidResult, Estimate, FplTable, InsuranceType, Program } from "./types";
+import { InvalidInputError } from "./validation";
 
 /**
  * The poverty guideline for a household of n in the 48 contiguous states.
@@ -17,7 +18,20 @@ export function fplPercent(
   householdSize: number,
   fpl: FplTable,
 ): number {
-  return (income / guideline(householdSize, fpl)) * 100;
+  // A household size below 1 still yields a positive guideline under the linear
+  // form (n = 0 gives $10,280), so it has to be rejected on its own terms
+  // rather than caught by a non-positive guideline check.
+  if (!Number.isInteger(householdSize) || householdSize < 1) {
+    throw new InvalidInputError(`Invalid household size: ${householdSize}`);
+  }
+  if (!Number.isFinite(income) || income < 0) {
+    throw new InvalidInputError(`Invalid income: ${income}`);
+  }
+  const g = guideline(householdSize, fpl);
+  if (!Number.isFinite(g) || g <= 0) {
+    throw new InvalidInputError(`Invalid poverty guideline for household ${householdSize}`);
+  }
+  return (income / g) * 100;
 }
 
 /** A program matches when all four conditions hold. */
@@ -25,6 +39,9 @@ export function isEligible(
   program: Program,
   opts: { fplPercent: number; diagnosis: string; insuranceType: InsuranceType },
 ): boolean {
+  // A NaN percentage must never pass the gate: `NaN > 500` is false, which
+  // would silently match every fund.
+  if (!Number.isFinite(opts.fplPercent)) return false;
   if (opts.fplPercent > program.maxFplPercent) return false;
   if (program.diagnoses.length > 0 && !program.diagnoses.includes(opts.diagnosis)) {
     return false;

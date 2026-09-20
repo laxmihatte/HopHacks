@@ -11,7 +11,7 @@ Requirements* (2026-09-19).
 
 ```bash
 npm install
-npm test          # 32 tests — the cost engine and the matcher
+npm test          # 65 tests — engine, matcher, validation, data integrity
 npm run dev       # http://localhost:3000
 ```
 
@@ -173,6 +173,20 @@ nothing.
 Every one of these is a defensible cut, and each is stated in the product's own
 assumptions block, not only here.
 
+## Input validation
+
+The UI owns validation; native constraint validation is turned off (`noValidate`) so
+the submit button and the browser can never disagree. `lib/validation.ts` is shared by
+the form and the engine:
+
+- Money fields accept any real value — `step="any"`, not round hundreds. A $1,750
+  deductible, $85,500 income and 17.5% coinsurance are all normal and all enterable.
+- A blank field is missing, not zero, and says so per field.
+- Dates are round-trip checked, so `0050-01-01` cannot become 1950 and `2026-13-45`
+  cannot roll forward to 2027-02-14.
+- The engine independently rejects what the UI should never send (`InvalidInputError`),
+  and the page wraps the call so a guard renders a message rather than a blank screen.
+
 ## Two deviations from the PRD
 
 1. **`drugs[].cycles`** was added to the regimen schema. The PRD assumes one flat drug
@@ -181,6 +195,18 @@ assumptions block, not only here.
    cycles and overstate gross cost by roughly 2x. Omitting the field means "every cycle."
 
 2. **A third regimen (TCHP) was added** and is the demo default. See below.
+
+## One judgement call worth knowing about
+
+Award caps are **annual**, but this tool applies the largest matching cap **once** across
+the whole course of treatment, even when treatment crosses a plan year. On the demo
+input that is the difference between showing $3,665 and showing $0.
+
+The conservative figure is shown deliberately. Renewal in a second plan year depends on
+the fund still being open and the patient still qualifying, and the PRD's governing
+principle is *never overstate relief*. The assumption is now stated in the product's
+assumptions block and on the program list, not just here. To change it, apply the cap
+per plan year in `applyAid` (`lib/matcher.ts`).
 
 ## The one thing the PRD got wrong
 

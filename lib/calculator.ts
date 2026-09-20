@@ -3,6 +3,7 @@
 // can never shift a cycle across the plan-year boundary.
 
 import type { CycleResult, Estimate, EstimateInput, Regimen } from "./types";
+import { InvalidInputError, assertValidEstimateInput, isValidIsoDate } from "./validation";
 
 const MS_PER_DAY = 86_400_000;
 
@@ -10,12 +11,22 @@ function round2(n: number): number {
   return Math.round((n + Number.EPSILON) * 100) / 100;
 }
 
-/** Parse yyyy-mm-dd as a UTC midnight timestamp. */
+/**
+ * Parse yyyy-mm-dd as a UTC midnight timestamp.
+ *
+ * `Date.UTC` is not used directly: it maps years 0-99 onto 1900-1999 (so
+ * "0050-01-01" would become 1950) and rolls overflow forward (so "2026-13-45"
+ * would become 2027-02-14). Both are rejected instead.
+ */
 export function parseIsoUtc(iso: string): number {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
-  if (!m) throw new Error(`Expected yyyy-mm-dd, got "${iso}"`);
-  const [, y, mo, d] = m;
-  return Date.UTC(Number(y), Number(mo) - 1, Number(d));
+  if (!isValidIsoDate(iso)) {
+    throw new InvalidInputError(`Expected a real yyyy-mm-dd date, got "${iso}"`);
+  }
+  const [y, mo, d] = iso.split("-").map(Number);
+  const dt = new Date(0);
+  dt.setUTCFullYear(y, mo - 1, d);
+  dt.setUTCHours(0, 0, 0, 0);
+  return dt.getTime();
 }
 
 export function toIsoUtc(ms: number): string {
@@ -65,6 +76,14 @@ export function planYearOf(iso: string): number {
  * out-of-pocket cap — and zeroing both accumulators at each plan-year boundary.
  */
 export function estimate(input: EstimateInput, regimen: Regimen): Estimate {
+  assertValidEstimateInput(input);
+  if (!Number.isInteger(regimen.cycleCount) || regimen.cycleCount < 1) {
+    throw new InvalidInputError(`Regimen "${regimen.id}" has no cycles`);
+  }
+  if (!Number.isInteger(regimen.cycleLengthDays) || regimen.cycleLengthDays < 1) {
+    throw new InvalidInputError(`Regimen "${regimen.id}" has an invalid cycle length`);
+  }
+
   const dates = cycleDates(input.startDate, regimen.cycleCount, regimen.cycleLengthDays);
 
   let deductibleRemaining = input.deductible;

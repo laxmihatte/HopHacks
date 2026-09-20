@@ -42,6 +42,12 @@ const LIMITATIONS: { what: string; effect: string }[] = [
       "Programs frequently cannot be stacked. Summing them would overstate relief — the one direction this tool must never err in.",
   },
   {
+    what:
+      "That award cap is applied once across the whole course of treatment, even when treatment crosses a plan year",
+    effect:
+      "Award caps are annual, so a patient who re-applies successfully in the second year could receive more aid than shown. Renewal is not assumed, because it depends on the fund still being open and the patient still qualifying. This estimate is deliberately the conservative one.",
+  },
+  {
     what: "Doses are computed at a standard body surface area of 1.7 m²",
     effect: "A patient's actual dose is weight- and height-dependent.",
   },

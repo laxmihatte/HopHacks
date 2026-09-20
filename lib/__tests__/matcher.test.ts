@@ -4,6 +4,7 @@ import { estimate } from "../calculator";
 import type { Estimate, EstimateInput, FplTable, Program, Regimen } from "../types";
 import fpl from "../../data/fpl.json";
 import programs from "../../data/programs.json";
+import regimens from "../../data/regimens.json";
 
 const table = fpl as FplTable;
 const all = programs as Program[];
@@ -101,7 +102,7 @@ describe("aid application never overstates relief", () => {
 });
 
 describe("end to end on the demo input", () => {
-  const tchp = (require("../../data/regimens.json") as Regimen[]).find((r) => r.id === "tchp")!;
+  const tchp = (regimens as Regimen[]).find((r) => r.id === "tchp")!;
   const input: EstimateInput = {
     regimenId: "tchp",
     startDate: "2026-10-15",

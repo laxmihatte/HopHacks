@@ -20,12 +20,19 @@ const shortDate = (iso: string) =>
     timeZone: "UTC",
   });
 
-/** A y-axis top and step that produce round gridline labels. */
-function niceScale(max: number): { top: number; step: number } {
-  if (max <= 0) return { top: 100, step: 25 };
+/**
+ * A y-axis top and step that produce round, distinct gridline labels.
+ *
+ * The step is never below $1: axis labels are whole dollars, so a sub-dollar
+ * step renders repeated values ("$0, $0, $1, $1, $1") on a patient who pays
+ * nothing.
+ */
+export function niceScale(max: number): { top: number; step: number } {
+  if (!Number.isFinite(max) || max <= 0) return { top: 100, step: 25 };
   const raw = max / 4;
   const mag = 10 ** Math.floor(Math.log10(raw));
-  const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => s >= raw) ?? 10 * mag;
+  const candidate = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => s >= raw) ?? 10 * mag;
+  const step = Math.max(1, Math.round(candidate));
   return { top: Math.ceil(max / step) * step, step };
 }
 
@@ -41,7 +48,7 @@ export default function CostChart({
   const [hover, setHover] = useState<number | null>(null);
 
   const { cycles } = estimate;
-  const peak = Math.max(...cycles.map((c) => c.cumulativePatientPays), 1);
+  const peak = Math.max(...cycles.map((c) => c.cumulativePatientPays), 0);
   const { top, step } = useMemo(() => niceScale(peak), [peak]);
 
   const plotW = W - PAD.left - PAD.right;
@@ -71,7 +78,37 @@ export default function CostChart({
     "Z",
   ].join(" ");
 
-  const gridValues = Array.from({ length: Math.round(top / step) + 1 }, (_, i) => i * step);
+  const endBefore = estimate.totalPatientPays;
+  const endAfter = afterAidCumulative.at(-1) ?? 0;
+
+  /**
+   * End labels, de-collided. When aid covers everything, both curves finish at
+   * the same value and the two labels would render exactly on top of each
+   * other; a single label is drawn instead. When they merely sit close, they
+   * are nudged apart.
+   */
+  const endLabels: { key: string; y: number; text: string }[] = (() => {
+    if (!hasAid || endBefore === endAfter) {
+      return [{ key: "before", y: y(endBefore), text: money(endBefore) }];
+    }
+    const yb = y(endBefore);
+    const ya = y(endAfter);
+    const MIN_GAP = 13;
+    if (Math.abs(yb - ya) >= MIN_GAP) {
+      return [
+        { key: "before", y: yb, text: money(endBefore) },
+        { key: "after", y: ya, text: money(endAfter) },
+      ];
+    }
+    const mid = (yb + ya) / 2;
+    return [
+      { key: "before", y: mid - MIN_GAP / 2, text: money(endBefore) },
+      { key: "after", y: mid + MIN_GAP / 2, text: money(endAfter) },
+    ];
+  })();
+
+  const gridCount = Math.min(12, Math.max(1, Math.round(top / step)));
+  const gridValues = Array.from({ length: gridCount + 1 }, (_, i) => i * step);
 
   // A plan-year boundary sits between the last cycle of one year and the first
   // of the next. Draw the rule midway, which is where the reset actually lands.
@@ -190,7 +227,8 @@ export default function CostChart({
             strokeWidth={1}
           />
           {cycles.map((c, i) =>
-            i % Math.ceil(cycles.length / 7) === 0 || i === cycles.length - 1 ? (
+            i % Math.max(1, Math.ceil(cycles.length / 7)) === 0 ||
+            i === cycles.length - 1 ? (
               <text
                 key={c.index}
                 x={x(i)}
@@ -264,28 +302,19 @@ export default function CostChart({
           )}
 
           {/* Direct end labels — identity is never colour alone. */}
-          <text
-            x={x(cycles.length - 1) + 8}
-            y={y(estimate.totalPatientPays) + 4}
-            fontSize={11}
-            fontWeight={600}
-            fill="var(--text-primary)"
-            className="tnum"
-          >
-            {money(estimate.totalPatientPays)}
-          </text>
-          {hasAid && (
+          {endLabels.map((l) => (
             <text
+              key={l.key}
               x={x(cycles.length - 1) + 8}
-              y={y(afterAidCumulative.at(-1) ?? 0) + 4}
+              y={l.y + 4}
               fontSize={11}
               fontWeight={600}
               fill="var(--text-primary)"
               className="tnum"
             >
-              {money(afterAidCumulative.at(-1) ?? 0)}
+              {l.text}
             </text>
-          )}
+          ))}
         </svg>
 
         {active && (

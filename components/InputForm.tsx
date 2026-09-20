@@ -1,18 +1,8 @@
 "use client";
 
-import type { InsuranceType, Regimen } from "@/lib/types";
+import type { FormState, InsuranceType, Regimen } from "@/lib/types";
+import { MAX_HOUSEHOLD, MAX_YEAR, MIN_YEAR, type FieldErrors } from "@/lib/validation";
 
-export interface FormState {
-  diagnosis: string;
-  regimenId: string;
-  startDate: string;
-  insuranceType: InsuranceType;
-  deductible: number;
-  coinsurancePercent: number;
-  oopMax: number;
-  householdSize: number;
-  income: number;
-}
 
 const DIAGNOSIS_LABELS: Record<string, string> = {
   "breast-cancer": "Breast cancer",
@@ -26,23 +16,39 @@ const INSURANCE_TYPES: { value: InsuranceType; label: string }[] = [
   { value: "uninsured", label: "Uninsured" },
 ];
 
+function FieldError({ message }: { message?: string }) {
+  if (!message) return null;
+  return (
+    <span role="alert" className="mt-1.5 block text-[11px] text-[var(--series-2)]">
+      {message}
+    </span>
+  );
+}
+
 const labelCls = "block text-xs font-medium text-[var(--text-secondary)]";
 const fieldCls =
-  "mt-1.5 w-full rounded-lg border border-[var(--border-2)] bg-[var(--surface-1)] px-3 py-2 text-[14px] text-[var(--text-primary)] outline-none focus:border-[var(--series-1)] focus:ring-2 focus:ring-[var(--series-1)]/25";
+  "mt-1.5 w-full rounded-lg border border-[var(--border-2)] bg-[var(--surface-1)] px-3 py-2 text-[14px] text-[var(--text-primary)] focus-visible:border-[var(--series-1)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--series-1)]";
+
+export type { FormState };
 
 export default function InputForm({
   value,
   onChange,
   onSubmit,
+  onReset,
+  canReset,
   regimens,
-  oopError,
+  errors,
 }: {
   value: FormState;
   onChange: (next: FormState) => void;
   onSubmit: () => void;
+  onReset: () => void;
+  canReset: boolean;
   regimens: Regimen[];
-  oopError: string | null;
+  errors: FieldErrors;
 }) {
+  const blocked = Object.keys(errors).length > 0;
   const set = <K extends keyof FormState>(key: K, v: FormState[K]) =>
     onChange({ ...value, [key]: v });
 
@@ -51,10 +57,11 @@ export default function InputForm({
 
   return (
     <form
+      noValidate
       className="rounded-xl border border-[var(--border-1)] bg-[var(--surface-1)] p-5"
       onSubmit={(e) => {
         e.preventDefault();
-        if (!oopError) onSubmit();
+        if (!blocked) onSubmit();
       }}
     >
       <fieldset className="border-0 p-0">
@@ -69,8 +76,15 @@ export default function InputForm({
               value={value.diagnosis}
               onChange={(e) => {
                 const diagnosis = e.target.value;
-                const first = regimens.find((r) => r.diagnosis === diagnosis);
-                onChange({ ...value, diagnosis, regimenId: first?.id ?? "" });
+                // Only re-point the regimen when the current one no longer
+                // belongs to the chosen diagnosis. Re-picking the same
+                // diagnosis must leave the regimen untouched.
+                const current = regimens.find((r) => r.id === value.regimenId);
+                const regimenId =
+                  current?.diagnosis === diagnosis
+                    ? value.regimenId
+                    : (regimens.find((r) => r.diagnosis === diagnosis)?.id ?? "");
+                onChange({ ...value, diagnosis, regimenId });
               }}
             >
               {diagnoses.map((d) => (
@@ -100,11 +114,14 @@ export default function InputForm({
             <span className={labelCls}>Treatment start date</span>
             <input
               type="date"
-              className={fieldCls}
+              min={`${MIN_YEAR}-01-01`}
+              max={`${MAX_YEAR}-12-31`}
+              aria-invalid={errors.startDate ? true : undefined}
+              className={`${fieldCls} ${errors.startDate ? "border-[var(--series-2)]" : ""}`}
               value={value.startDate}
               onChange={(e) => set("startDate", e.target.value)}
-              required
             />
+            <FieldError message={errors.startDate} />
           </label>
         </div>
       </fieldset>
@@ -125,7 +142,7 @@ export default function InputForm({
                     value={t.value}
                     checked={value.insuranceType === t.value}
                     onChange={() => set("insuranceType", t.value)}
-                    className="accent-[var(--series-1)]"
+                    className="accent-[var(--series-1)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--series-1)]"
                   />
                   {t.label}
                 </label>
@@ -138,11 +155,14 @@ export default function InputForm({
             <input
               type="number"
               min={0}
-              step={100}
-              className={`${fieldCls} tnum`}
+              step="any"
+              inputMode="decimal"
+              aria-invalid={errors.deductible ? true : undefined}
+              className={`${fieldCls} tnum ${errors.deductible ? "border-[var(--series-2)]" : ""}`}
               value={value.deductible}
-              onChange={(e) => set("deductible", Number(e.target.value))}
+              onChange={(e) => set("deductible", e.target.value)}
             />
+            <FieldError message={errors.deductible} />
           </label>
 
           <label>
@@ -151,11 +171,14 @@ export default function InputForm({
               type="number"
               min={0}
               max={100}
-              step={1}
-              className={`${fieldCls} tnum`}
+              step="any"
+              inputMode="decimal"
+              aria-invalid={errors.coinsurancePercent ? true : undefined}
+              className={`${fieldCls} tnum ${errors.coinsurancePercent ? "border-[var(--series-2)]" : ""}`}
               value={value.coinsurancePercent}
-              onChange={(e) => set("coinsurancePercent", Number(e.target.value))}
+              onChange={(e) => set("coinsurancePercent", e.target.value)}
             />
+            <FieldError message={errors.coinsurancePercent} />
           </label>
 
           <label>
@@ -163,15 +186,14 @@ export default function InputForm({
             <input
               type="number"
               min={0}
-              step={100}
-              aria-invalid={oopError ? true : undefined}
-              className={`${fieldCls} tnum ${oopError ? "border-[var(--series-2)]" : ""}`}
+              step="any"
+              inputMode="decimal"
+              aria-invalid={errors.oopMax ? true : undefined}
+              className={`${fieldCls} tnum ${errors.oopMax ? "border-[var(--series-2)]" : ""}`}
               value={value.oopMax}
-              onChange={(e) => set("oopMax", Number(e.target.value))}
+              onChange={(e) => set("oopMax", e.target.value)}
             />
-            {oopError && (
-              <span className="mt-1.5 block text-[11px] text-[var(--series-2)]">{oopError}</span>
-            )}
+            <FieldError message={errors.oopMax} />
           </label>
         </div>
       </fieldset>
@@ -186,12 +208,15 @@ export default function InputForm({
             <input
               type="number"
               min={1}
-              max={12}
+              max={MAX_HOUSEHOLD}
               step={1}
-              className={`${fieldCls} tnum`}
+              inputMode="numeric"
+              aria-invalid={errors.householdSize ? true : undefined}
+              className={`${fieldCls} tnum ${errors.householdSize ? "border-[var(--series-2)]" : ""}`}
               value={value.householdSize}
-              onChange={(e) => set("householdSize", Number(e.target.value))}
+              onChange={(e) => set("householdSize", e.target.value)}
             />
+            <FieldError message={errors.householdSize} />
           </label>
 
           <label>
@@ -199,25 +224,41 @@ export default function InputForm({
             <input
               type="number"
               min={0}
-              step={1000}
-              className={`${fieldCls} tnum`}
+              step="any"
+              inputMode="decimal"
+              aria-invalid={errors.income ? true : undefined}
+              className={`${fieldCls} tnum ${errors.income ? "border-[var(--series-2)]" : ""}`}
               value={value.income}
-              onChange={(e) => set("income", Number(e.target.value))}
+              onChange={(e) => set("income", e.target.value)}
             />
+            <FieldError message={errors.income} />
           </label>
         </div>
       </fieldset>
 
-      <div className="mt-6 flex items-center gap-4">
+      <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-2">
         <button
           type="submit"
-          disabled={!!oopError}
-          className="rounded-lg bg-[var(--series-1)] px-5 py-2.5 text-[14px] font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+          disabled={blocked}
+          className="rounded-lg bg-[var(--series-1)] px-5 py-2.5 text-[14px] font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--series-1)]"
         >
           Estimate my cost
         </button>
-        <span className="text-xs text-[var(--text-muted)]">
-          Nothing you type leaves your browser.
+        <button
+          type="reset"
+          disabled={!canReset}
+          onClick={onReset}
+          title="Put every field back to its starting value"
+          className="rounded-lg border border-[var(--border-2)] px-4 py-2.5 text-[14px] font-medium text-[var(--text-primary)] hover:bg-[var(--surface-2)] disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--series-1)]"
+        >
+          Reset
+        </button>
+        <span className="ml-1 text-xs text-[var(--text-muted)]">
+          {blocked
+            ? "Fix the highlighted fields to continue."
+            : canReset
+              ? "Reset puts every field back to its starting value."
+              : "Nothing you type leaves your browser."}
         </span>
       </div>
     </form>

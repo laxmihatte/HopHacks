@@ -76,9 +76,12 @@ export default function ProgramList({ aid }: { aid: AidResult }) {
             </div>
             {i === 0 && (
               <p className="mt-2.5 border-t border-[var(--border-1)] pt-2 text-[11px] leading-relaxed text-[var(--text-secondary)]">
-                Only this cap — the largest single one — is applied to the after-aid curve.
-                Caps are not summed, because programs frequently cannot be stacked and a
-                summed figure would overstate the relief available.
+                Only this cap — the largest single one — is applied to the after-aid curve,
+                once across the whole course of treatment. Caps are not summed, because
+                programs frequently cannot be stacked. Nor is this annual cap assumed to
+                renew if treatment crosses a plan year, because renewal depends on the fund
+                still being open and on qualifying again. Both choices err the same way: they
+                never overstate the relief available.
               </p>
             )}
           </li>

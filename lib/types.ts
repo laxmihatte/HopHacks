@@ -105,3 +105,19 @@ export interface AidResult {
   afterAidCumulative: number[];
   totalAfterAid: number;
 }
+
+/**
+ * The form's raw, editable state. Numeric fields are strings so a cleared
+ * field stays cleared instead of silently becoming zero.
+ */
+export interface FormState {
+  diagnosis: string;
+  regimenId: string;
+  startDate: string;
+  insuranceType: InsuranceType;
+  deductible: string;
+  coinsurancePercent: string;
+  oopMax: string;
+  householdSize: string;
+  income: string;
+}

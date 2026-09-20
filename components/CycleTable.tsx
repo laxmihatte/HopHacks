@@ -31,16 +31,20 @@ export default function CycleTable({
       </h2>
       <div className="-mx-5 overflow-x-auto px-5">
         <table className="w-full min-w-[620px] border-collapse text-[13px]">
+          <caption className="sr-only">
+            Cost per treatment cycle: date, amount billed, deductible applied, coinsurance,
+            what the patient pays, and the running total.
+          </caption>
           <thead>
             <tr className="border-b border-[var(--border-2)] text-left text-xs text-[var(--text-muted)]">
-              <th className="py-2 pr-3 font-medium">Cycle</th>
-              <th className="py-2 pr-3 font-medium">Date</th>
-              <th className="py-2 pr-3 text-right font-medium">Billed</th>
-              <th className="py-2 pr-3 text-right font-medium">Deductible</th>
-              <th className="py-2 pr-3 text-right font-medium">Coinsurance</th>
-              <th className="py-2 pr-3 text-right font-medium">Patient pays</th>
-              <th className="py-2 pr-3 text-right font-medium">Running total</th>
-              {hasAid && <th className="py-2 text-right font-medium">After aid</th>}
+              <th scope="col" className="py-2 pr-3 font-medium">Cycle</th>
+              <th scope="col" className="py-2 pr-3 font-medium">Date</th>
+              <th scope="col" className="py-2 pr-3 text-right font-medium">Billed</th>
+              <th scope="col" className="py-2 pr-3 text-right font-medium">Deductible</th>
+              <th scope="col" className="py-2 pr-3 text-right font-medium">Coinsurance</th>
+              <th scope="col" className="py-2 pr-3 text-right font-medium">Patient pays</th>
+              <th scope="col" className="py-2 pr-3 text-right font-medium">Running total</th>
+              {hasAid && <th scope="col" className="py-2 text-right font-medium">After aid</th>}
             </tr>
           </thead>
           <tbody>
@@ -54,7 +58,9 @@ export default function CycleTable({
                     : undefined
                 }
               >
-                <td className="py-2 pr-3 tnum text-[var(--text-secondary)]">{c.index}</td>
+                <th scope="row" className="py-2 pr-3 text-left font-normal tnum text-[var(--text-secondary)]">
+                  {c.index}
+                </th>
                 <td className="py-2 pr-3 text-[var(--text-secondary)]">
                   {shortDate(c.date)}
                   {c.planYearReset && (

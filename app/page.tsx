@@ -1,15 +1,17 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import AssumptionsBlock from "@/components/AssumptionsBlock";
 import CostChart from "@/components/CostChart";
 import CycleTable from "@/components/CycleTable";
 import DisclaimerBanner from "@/components/DisclaimerBanner";
-import InputForm, { type FormState } from "@/components/InputForm";
+import InputForm from "@/components/InputForm";
 import ProgramList from "@/components/ProgramList";
 import { estimate as runEstimate } from "@/lib/calculator";
 import { navigateAid } from "@/lib/matcher";
-import type { FplTable, Program, Regimen } from "@/lib/types";
+import type { FormState, FplTable, Program, Regimen } from "@/lib/types";
+import { parseField, validateForm } from "@/lib/validation";
+import { decodeForm, encodeForm } from "@/lib/url";
 import fplData from "@/data/fpl.json";
 import programData from "@/data/programs.json";
 import regimenData from "@/data/regimens.json";
@@ -17,6 +19,9 @@ import regimenData from "@/data/regimens.json";
 const REGIMENS = regimenData as Regimen[];
 const PROGRAMS = programData as Program[];
 const FPL = fplData as FplTable;
+
+const isKnownRegimen = (id: string, diagnosis: string) =>
+  REGIMENS.some((r) => r.id === id && r.diagnosis === diagnosis);
 
 const money = (n: number) =>
   n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
@@ -27,58 +32,148 @@ const DEFAULTS: FormState = {
   regimenId: "tchp",
   startDate: "2026-10-15",
   insuranceType: "commercial",
-  deductible: 3000,
-  coinsurancePercent: 20,
-  oopMax: 9000,
-  householdSize: 4,
-  income: 85000,
+  deductible: "3000",
+  coinsurancePercent: "20",
+  oopMax: "9000",
+  householdSize: "4",
+  income: "85000",
 };
+
+
 
 export default function Page() {
   const [form, setForm] = useState<FormState>(DEFAULTS);
   const [submitted, setSubmitted] = useState<FormState | null>(null);
 
-  // The one validation rule that carries real meaning: an out-of-pocket
-  // maximum below the deductible is incoherent.
-  const oopError =
-    form.oopMax < form.deductible
-      ? "Out-of-pocket maximum cannot be below the deductible."
-      : null;
+  /**
+   * Each view is a real history entry, so the browser's Back and Forward
+   * buttons move between the form and the results instead of leaving the app.
+   * The results URL also carries the inputs, so a reload or a pasted link
+   * reopens the same estimate.
+   */
+  const show = useCallback((next: FormState | null, mode: "push" | "replace" = "push") => {
+    setSubmitted(next);
+    if (next) setForm(next);
+    if (typeof window !== "undefined") {
+      const url = next ? `${window.location.pathname}?${encodeForm(next)}` : window.location.pathname;
+      window.history[mode === "push" ? "pushState" : "replaceState"]({}, "", url);
+      window.scrollTo({ top: 0 });
+    }
+  }, []);
+
+  // Restore from the URL on first paint, and follow Back/Forward after that.
+  // Reading location in an effect rather than during render keeps the server
+  // and client markup identical.
+  useEffect(() => {
+    const fromUrl = () => {
+      const decoded = decodeForm(window.location.search, isKnownRegimen);
+      setSubmitted(decoded);
+      if (decoded) setForm(decoded);
+    };
+    fromUrl();
+    window.addEventListener("popstate", fromUrl);
+    return () => window.removeEventListener("popstate", fromUrl);
+  }, []);
+
+  const errors = validateForm(form);
+
+  const canReset = (Object.keys(DEFAULTS) as (keyof FormState)[]).some(
+    (k) => form[k] !== DEFAULTS[k],
+  );
 
   const result = useMemo(() => {
     if (!submitted) return null;
     const regimen = REGIMENS.find((r) => r.id === submitted.regimenId);
-    if (!regimen) return null;
+    if (!regimen) return { error: "That regimen is no longer available." } as const;
 
-    const est = runEstimate(
+    const deductible = parseField(submitted.deductible);
+    const coinsurancePercent = parseField(submitted.coinsurancePercent);
+    const oopMax = parseField(submitted.oopMax);
+    const householdSize = parseField(submitted.householdSize);
+    const income = parseField(submitted.income);
+    if (
+      deductible === null ||
+      coinsurancePercent === null ||
+      oopMax === null ||
+      householdSize === null ||
+      income === null
+    ) {
+      return { error: "Some inputs could not be read as numbers." } as const;
+    }
+
+    try {
+      const est = runEstimate(
       {
         regimenId: submitted.regimenId,
         startDate: submitted.startDate,
-        deductible: submitted.deductible,
-        coinsuranceRate: submitted.coinsurancePercent / 100,
-        oopMax: submitted.oopMax,
-        householdSize: submitted.householdSize,
-        income: submitted.income,
+        deductible,
+        coinsuranceRate: coinsurancePercent / 100,
+        oopMax,
+        householdSize,
+        income,
         insuranceType: submitted.insuranceType,
       },
       regimen,
     );
 
-    const aid = navigateAid(est, PROGRAMS, FPL, {
-      income: submitted.income,
-      householdSize: submitted.householdSize,
-      diagnosis: regimen.diagnosis,
-      insuranceType: submitted.insuranceType,
-    });
+      const aid = navigateAid(est, PROGRAMS, FPL, {
+        income,
+        householdSize,
+        diagnosis: regimen.diagnosis,
+        insuranceType: submitted.insuranceType,
+      });
 
-    return { regimen, est, aid };
+      return {
+        regimen,
+        est,
+        aid,
+        inputs: { deductible, coinsurancePercent, oopMax, householdSize, income },
+      };
+    } catch (e) {
+      return {
+        error: e instanceof Error ? e.message : "This estimate could not be calculated.",
+      } as const;
+    }
   }, [submitted]);
 
-  const hasAid = !!result && result.aid.bestAwardCap > 0;
+  const ok = result && !("error" in result) ? result : null;
+  const hasAid = !!ok && ok.aid.bestAwardCap > 0;
 
   return (
     <div className="min-h-screen">
-      <DisclaimerBanner />
+      <div className="sticky top-0 z-30 bg-[var(--surface-0)]">
+        <DisclaimerBanner />
+        {ok && (
+          <div className="border-b border-[var(--border-1)] bg-[var(--surface-2)]">
+            <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-5 gap-y-1.5 px-4 py-2.5 text-[13px] sm:px-6">
+              <span className="font-medium text-[var(--text-primary)]">
+                {ok.regimen.name.split(" (")[0]}
+              </span>
+              <span className="hidden text-[var(--text-secondary)] sm:inline">
+                {ok.regimen.cycleCount} cycles from {submitted!.startDate}
+              </span>
+              <span className="hidden text-[var(--text-secondary)] capitalize md:inline">
+                {submitted!.insuranceType}
+              </span>
+              <span className="hidden tnum text-[var(--text-secondary)] lg:inline">
+                {money(ok.inputs.deductible)} deductible ·{" "}
+                {ok.inputs.coinsurancePercent}% coinsurance ·{" "}
+                {money(ok.inputs.oopMax)} max
+              </span>
+              <span className="hidden tnum text-[var(--text-secondary)] lg:inline">
+                Household of {ok.inputs.householdSize}, {money(ok.inputs.income)}
+              </span>
+              <button
+                type="button"
+                onClick={() => show(null)}
+                className="ml-auto rounded-md border border-[var(--border-2)] bg-[var(--surface-1)] px-3 py-1.5 text-[13px] font-medium text-[var(--text-primary)] hover:bg-[var(--surface-0)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--series-1)]"
+              >
+                Change inputs
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
 
       <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
         <header className="mb-7">
@@ -92,62 +187,40 @@ export default function Page() {
           </p>
         </header>
 
-        {result ? (
-          <div className="space-y-5">
-            {/* The form collapses to a summary strip once results render. */}
-            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border border-[var(--border-1)] bg-[var(--surface-2)] px-4 py-3 text-[13px]">
-              <span className="font-medium text-[var(--text-primary)]">
-                {result.regimen.name.split(" (")[0]}
-              </span>
-              <span className="text-[var(--text-secondary)]">
-                {result.regimen.cycleCount} cycles from {submitted!.startDate}
-              </span>
-              <span className="text-[var(--text-secondary)] capitalize">
-                {submitted!.insuranceType}
-              </span>
-              <span className="tnum text-[var(--text-secondary)]">
-                {money(submitted!.deductible)} deductible · {submitted!.coinsurancePercent}%
-                coinsurance · {money(submitted!.oopMax)} max
-              </span>
-              <span className="tnum text-[var(--text-secondary)]">
-                Household of {submitted!.householdSize}, {money(submitted!.income)}
-              </span>
-              <button
-                type="button"
-                onClick={() => setSubmitted(null)}
-                className="ml-auto rounded-md border border-[var(--border-2)] px-3 py-1.5 text-[13px] font-medium text-[var(--text-primary)] hover:bg-[var(--surface-1)]"
-              >
-                Change inputs
-              </button>
-            </div>
-
+        {ok ? (
+          <div
+            className="space-y-5"
+            role="region"
+            aria-live="polite"
+            aria-label="Your cost estimate"
+          >
             {/* Headline. Largest type on the page. */}
             <section className="grid gap-4 sm:grid-cols-2">
               <div className="rounded-xl border border-[var(--border-1)] bg-[var(--surface-1)] p-5">
-                <div className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
+                <h2 className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
                   Your cost before aid
-                </div>
+                </h2>
                 <div className="tnum mt-1.5 text-4xl font-semibold text-[var(--text-primary)]">
-                  {money(result.est.totalPatientPays)}
+                  {money(ok.est.totalPatientPays)}
                 </div>
                 <div className="mt-1.5 tnum text-[13px] text-[var(--text-secondary)]">
-                  out of {money(result.est.totalGross)} billed
+                  out of {money(ok.est.totalGross)} billed
                 </div>
               </div>
               <div
                 className="rounded-xl border bg-[var(--surface-1)] p-5"
                 style={{ borderColor: hasAid ? "var(--series-2)" : "var(--border-1)" }}
               >
-                <div className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
+                <h2 className="text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
                   Your cost after aid
-                </div>
+                </h2>
                 <div className="tnum mt-1.5 text-4xl font-semibold text-[var(--text-primary)]">
-                  {money(result.aid.totalAfterAid)}
+                  {money(ok.aid.totalAfterAid)}
                 </div>
                 <div className="mt-1.5 tnum text-[13px] text-[var(--text-secondary)]">
                   {hasAid
                     ? `${money(
-                        result.est.totalPatientPays - result.aid.totalAfterAid,
+                        ok.est.totalPatientPays - ok.aid.totalAfterAid,
                       )} covered by the largest fund you match`
                     : "no matching programs — see below"}
                 </div>
@@ -156,11 +229,11 @@ export default function Page() {
 
             <section className="rounded-xl border border-[var(--border-1)] bg-[var(--surface-1)] p-5">
               <CostChart
-                estimate={result.est}
-                afterAidCumulative={result.aid.afterAidCumulative}
+                estimate={ok.est}
+                afterAidCumulative={ok.aid.afterAidCumulative}
                 hasAid={hasAid}
               />
-              {result.est.cycles.some((c) => c.planYearReset) && (
+              {ok.est.cycles.some((c) => c.planYearReset) && (
                 <p className="mt-4 border-t border-[var(--border-1)] pt-3.5 text-[13px] leading-relaxed text-[var(--text-secondary)]">
                   <span className="font-medium text-[var(--text-primary)]">
                     This course of treatment crosses a plan year.
@@ -174,21 +247,39 @@ export default function Page() {
             </section>
 
             <CycleTable
-              estimate={result.est}
-              afterAidCumulative={result.aid.afterAidCumulative}
+              estimate={ok.est}
+              afterAidCumulative={ok.aid.afterAidCumulative}
               hasAid={hasAid}
             />
-            <ProgramList aid={result.aid} />
-            <AssumptionsBlock regimen={result.regimen} />
+            <ProgramList aid={ok.aid} />
+            <AssumptionsBlock regimen={ok.regimen} />
           </div>
         ) : (
-          <InputForm
+          <>
+            {result && "error" in result && (
+              <div
+                role="alert"
+                className="mb-5 rounded-xl border p-4 text-[13px] leading-relaxed"
+                style={{
+                  borderColor: "var(--series-2)",
+                  color: "var(--text-primary)",
+                  background: "var(--surface-1)",
+                }}
+              >
+                <strong className="font-semibold">This estimate could not be calculated.</strong>{" "}
+                {result.error} Adjust the inputs below and try again.
+              </div>
+            )}
+            <InputForm
             value={form}
             onChange={setForm}
-            onSubmit={() => setSubmitted(form)}
+            onSubmit={() => show(form)}
+            onReset={() => setForm(DEFAULTS)}
+            canReset={canReset}
             regimens={REGIMENS}
-            oopError={oopError}
+            errors={errors}
           />
+          </>
         )}
       </main>
     </div>
