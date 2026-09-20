@@ -51,7 +51,13 @@ describe("routeByKeyword", () => {
   });
 
   it("weights a two-word phrase above a shared single word", () => {
-    // "stiff neck" is GB20-specific; "headache" is shared with LI4.
+    // "tension headache" is LI4-specific; "headache" alone is shared.
+    expect(ids("tension headache")[0]).toBe("LI4");
+  });
+
+  it("breaks a tie toward the better-known point", () => {
+    // Both GB20 and SI3 list "stiff neck". GB20 is the classic answer, and
+    // POINT_IDS order encodes that, so the tie must not resolve to SI3.
     expect(ids("stiff neck")[0]).toBe("GB20");
   });
 

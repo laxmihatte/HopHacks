@@ -1,6 +1,45 @@
 import type { Vec3 } from "./anatomy";
 
-export type PointId = "LI4" | "GB20" | "PC6" | "ST36" | "SP6";
+/**
+ * Every id the app will ever show. Kept as an explicit union rather than
+ * derived from the JSON so that the model's tool schema, the router and the
+ * tests all agree on one closed set; `data.test.ts` asserts it matches the
+ * data file exactly.
+ */
+export type PointId =
+  | "LI4"
+  | "SI3"
+  | "LU9"
+  | "HT7"
+  | "PC6"
+  | "LU7"
+  | "TE5"
+  | "LI11"
+  | "GB21"
+  | "GB20"
+  | "GV20"
+  | "EX-HN5"
+  | "EX-HN3"
+  | "BL40"
+  | "ST36"
+  | "BL57"
+  | "SP6"
+  | "LR3";
+
+/** Which part of the body a point sits on. Drives the anatomy assertions. */
+export type Region =
+  | "hand"
+  | "wrist"
+  | "forearm"
+  | "elbow"
+  | "shoulder"
+  | "neck"
+  | "head"
+  | "knee"
+  | "leg"
+  | "calf"
+  | "ankle"
+  | "foot";
 
 /** How hard to press. Ordered: light < moderate < firm < deep. */
 export type Pressure = "light" | "moderate" | "firm" | "deep";
@@ -12,9 +51,6 @@ export type Pressure = "light" | "moderate" | "firm" | "deep";
  */
 export type Sex = "male" | "female";
 
-/** Which face of the model the camera has to be on to see the point. */
-export type Approach = "front" | "back";
-
 export interface Acupoint {
   id: PointId;
   /** Pinyin name, e.g. "He Gu". */
@@ -22,7 +58,7 @@ export interface Acupoint {
   /** English gloss, e.g. "Union Valley". */
   translation: string;
   meridian: string;
-  region: string;
+  region: Region;
   /** Lay-language complaints this point is used for; the router matches on these. */
   symptoms: string[];
   location: string;
@@ -33,7 +69,14 @@ export interface Acupoint {
   cameraTarget: Vec3;
   /** How far back the camera sits from the target. Small points need to be closer. */
   cameraDistance: number;
-  approach: Approach;
+  /**
+   * Unit direction from the point to where the camera should sit.
+   *
+   * Per-point rather than derived from `approach`, because points sit on all
+   * four sides of a limb: viewing a point on the inner forearm from the
+   * front-right puts the arm itself between the camera and the dot.
+   */
+  cameraDir: Vec3;
   /** True when the point exists on both sides and should render a mirrored twin. */
   bilateral: boolean;
   caution: string | null;

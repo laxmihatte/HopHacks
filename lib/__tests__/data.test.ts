@@ -3,8 +3,19 @@ import { ACUPOINTS, POINT_IDS, coercePointIds, getPoint, isPointId } from "@/lib
 import { ROUTER_TOOL, systemPrompt } from "@/lib/prompt";
 
 describe("the acupoint database", () => {
-  it("contains the five MVP points", () => {
-    expect(POINT_IDS.sort()).toEqual(["GB20", "LI4", "PC6", "SP6", "ST36"]);
+  it("covers the whole body, not just one limb", () => {
+    // If every point were on the arm there would be nothing to find by
+    // orbiting the figure, which is the reason the 3D view exists at all.
+    const regions = new Set(POINT_IDS.map((id) => ACUPOINTS[id].region));
+    expect(POINT_IDS.length).toBeGreaterThanOrEqual(18);
+    expect(regions.size).toBeGreaterThanOrEqual(8);
+    for (const r of ["hand", "forearm", "head", "neck", "leg", "foot"]) {
+      expect([...regions], `no point on the ${r}`).toContain(r);
+    }
+  });
+
+  it("uses every meridian name it declares", () => {
+    for (const id of POINT_IDS) expect(ACUPOINTS[id].meridian).toBeTruthy();
   });
 
   for (const id of POINT_IDS) {
@@ -45,13 +56,13 @@ describe("id coercion", () => {
   });
 
   it("rejects anything outside the database", () => {
-    for (const bad of ["li4", "LI40", "LU7", "", "__proto__", "toString", null, 7, {}]) {
+    for (const bad of ["li4", "LI40", "LU99", "", "__proto__", "toString", null, 7, {}]) {
       expect(isPointId(bad), String(bad)).toBe(false);
     }
   });
 
   it("drops hallucinated ids and de-duplicates the rest", () => {
-    expect(coercePointIds(["LI4", "LU7", "LI4", "GB20", 42, null])).toEqual(["LI4", "GB20"]);
+    expect(coercePointIds(["LI4", "LU99", "LI4", "GB20", 42, null])).toEqual(["LI4", "GB20"]);
   });
 
   it("returns an empty list for non-arrays", () => {

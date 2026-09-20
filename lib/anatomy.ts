@@ -43,7 +43,60 @@ export const ELBOW = { y: 1.13, x: 0.21 } as const;
 /** Wrist crease at ~0.47 of stature, which is where an adult arm actually
  *  hangs. Sitting it lower makes the figure read as ape-armed. */
 export const WRIST = { y: 0.84, x: 0.225 } as const;
-export const HAND = { y: 0.765, x: 0.23, r: 0.045 } as const;
+/** Palm centre. An adult hand is ~0.19m, so knuckles sit at HAND.y - 0.055
+ *  and the fingertips reach roughly 0.655. */
+export const HAND = { y: 0.79, x: 0.228, r: 0.045 } as const;
+
+/**
+ * The four fingers, as offsets across the palm (Z) with their own lengths.
+ * Modelling them separately is what makes hand points readable: LI4 on the
+ * thumb webbing and SI3 on the little-finger edge are only distinguishable if
+ * there is a thumb and a little finger to sit beside.
+ */
+export const FINGERS: { z: number; length: number }[] = [
+  { z: 0.038, length: 0.072 },
+  { z: 0.014, length: 0.08 },
+  { z: -0.011, length: 0.076 },
+  { z: -0.034, length: 0.062 },
+];
+export const KNUCKLE_Y = 0.735;
+
+/**
+ * Where the clothing ends.
+ *
+ * The figure wears a tee and shorts, so the parts a user actually presses —
+ * forearms, hands, shins, feet, head and neck — are bare, and the skeleton can
+ * show through them. Everything above these lines is opaque fabric.
+ */
+export const CLOTHING = {
+  /** Sleeve hem, partway down the upper arm. */
+  sleeveY: 1.25,
+  /** Shorts hem, partway down the thigh. */
+  shortsY: 0.66,
+  /** Fabric sits just off the skin. */
+  ease: 0.006,
+} as const;
+
+/**
+ * Bones drawn inside the translucent skin, as in an anatomical chart.
+ *
+ * Offsets are given in the limb's own cross-section: Z for the forearm
+ * (radius on the thumb side, ulna on the little-finger side) and X for the
+ * lower leg (tibia medial, fibula lateral).
+ */
+export const BONE = {
+  humerus: 0.016,
+  radius: 0.0105,
+  ulna: 0.0105,
+  /** How far the paired forearm bones sit either side of the axis. */
+  forearmSplit: 0.011,
+  femur: 0.021,
+  tibia: 0.016,
+  fibula: 0.0075,
+  legSplit: 0.016,
+  metacarpal: 0.006,
+  phalanx: 0.005,
+} as const;
 
 export const HIP = { y: 0.9 } as const;
 export const KNEE = { y: 0.5, x: 0.105 } as const;

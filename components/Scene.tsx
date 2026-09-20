@@ -18,18 +18,14 @@ const HOME = {
   position: [0.95, HEIGHT * 0.72, 2.55] as Vec3,
 };
 
-/** Unit direction the camera sits in, relative to its target. */
-const DIRECTION = {
-  front: new THREE.Vector3(0.5, 0.28, 1).normalize(),
-  back: new THREE.Vector3(0.4, 0.28, -1).normalize(),
-};
-
 function desiredShot(point: Acupoint | null) {
   if (!point) return HOME;
   const target = new THREE.Vector3(...point.cameraTarget);
+  // The point carries its own view direction, so a dot on the inner forearm is
+  // approached from the inside rather than from behind the arm.
   const position = target
     .clone()
-    .add(DIRECTION[point.approach].clone().multiplyScalar(point.cameraDistance));
+    .add(new THREE.Vector3(...point.cameraDir).normalize().multiplyScalar(point.cameraDistance));
   return {
     target: target.toArray() as Vec3,
     position: position.toArray() as Vec3,
