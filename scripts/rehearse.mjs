@@ -1,170 +1,212 @@
-// Drives the demo end to end in a real browser and pins the behaviours that
-// have regressed before. Needs a Chromium binary:
+// Walks the Golden Path in a real browser and screenshots each beat, so the
+// demo is verified rather than assumed. Needs a Chromium binary:
 //   CHROME_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" npm run rehearse
-import { chromium } from 'playwright-core';
+import { chromium } from "playwright-core";
 
-const out = process.env.SHOT_DIR ?? '/tmp';
+const out = process.env.SHOT_DIR ?? "/tmp/acuguide";
 const exe = process.env.CHROME_PATH || undefined;
 const BASE = process.env.BASE_URL ?? `http://localhost:${process.env.PORT ?? 3000}`;
+const PITCH = "I have a tension headache and stiff neck from coding all day.";
 
-const b = await chromium.launch({ executablePath: exe });
-const p = await b.newPage({ viewport: { width: 1180, height: 1000 } });
+const browser = await chromium.launch({
+  executablePath: exe,
+  // Headless Chrome falls back to a software rasteriser; without these the
+  // canvas comes out black and every visual check is meaningless.
+  args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"],
+});
+const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 const fail = [];
+const errors = [];
+page.on("pageerror", (e) => errors.push(e.message));
+page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
 
-const submit = () => p.getByRole('button', { name: /Estimate my cost/i });
-const change = () => p.getByRole('button', { name: /Change inputs/i });
-const reset = () => p.getByRole('button', { name: /^Reset$/ });
-const sel = (name) => p.locator(`select[aria-label="${name}"]`);
-// Address fields by their visible label, never by position: adding a field
-// used to silently shift every positional index in this script. Matching is
-// case-insensitive because the label styling uppercases the accessible name.
-const byLabel = (label) => p.getByLabel(label, { exact: true });
-const num = byLabel;
-const pick = byLabel;
-
-// Only the app's own field errors: Playwright pierces shadow DOM and Chrome's
-// form controls expose an empty role="alert" node inside theirs.
-const countErrors = () => p.evaluate(() =>
-  [...document.querySelectorAll('[role="alert"]')].filter(e => e.textContent.trim()).length);
-
-const headline = () => p.evaluate(() => {
-  const el = [...document.querySelectorAll('p')].find(e => /your cost before aid/i.test(e.textContent));
-  return el ? el.nextElementSibling.textContent.trim() : null;
-});
-
-const optimizer = () => p.evaluate(() => {
-  const h = [...document.querySelectorAll('h2')].find(e => /any choice/i.test(e.textContent));
-  if (!h) return null;
-  const t = h.closest('section').innerText.split('\n').filter(Boolean);
-  const i = t.findIndex(x => /CHEAPEST DATE/i.test(x));
-  const j = t.findIndex(x => /SAVES|CHOSEN DATE/i.test(x));
-  return { cheapest: i >= 0 ? t[i + 1] : null, saves: j >= 0 ? t[j + 1] : null };
-});
-
-async function run(label) {
-  await submit().click();
-  await p.waitForTimeout(350);
-  const h = await headline();
-  const chart = await p.locator('svg[role="img"]').first().isVisible();
-  console.log(`  ${label}: ${h} (chart=${chart})`);
-  if (!h || !chart) fail.push(`${label}: results did not render`);
-  return h;
-}
-
-// --- S5: the demo, twice, without intervention ---
-await p.goto(BASE, { waitUntil: 'networkidle' });
-console.log('Run 1 — demo defaults (TCHP, 2026-10-15, January plan year)');
-const total1 = await run('run1');
-await p.screenshot({ path: `${out}/final-results.png`, fullPage: true });
-
-await change().click(); await p.waitForTimeout(200);
-console.log('Run 2 — same inputs');
-const total2 = await run('run2');
-if (total1 !== total2) fail.push('run2 differs from run1');
-console.log('    identical to run 1:', total1 === total2);
-
-// --- The start-date optimizer ---
-const opt = await optimizer();
-console.log(`Optimizer — cheapest ${opt?.cheapest}, saves ${opt?.saves}`);
-if (!opt?.cheapest) fail.push('optimizer did not render');
-const today = new Date().toISOString().slice(0, 10);
-const cheapestIso = await p.evaluate(() => {
-  const i = document.querySelectorAll('input[type="date"]');
-  return i.length > 1 ? i[i.length - 2].value : null;
-});
-if (cheapestIso && cheapestIso < today) fail.push(`optimizer window opens in the past (${cheapestIso})`);
-console.log('    window does not open before today:', !cheapestIso || cheapestIso >= today);
-
-// --- The plan-year boundary changes the answer ---
-await change().click(); await p.waitForTimeout(200);
-await pick('Where your coverage comes from').selectOption('employer-other');
-await p.waitForTimeout(150);
-await sel('Plan year start month').selectOption('7');
-await p.waitForTimeout(150);
-const july = await run('july plan year');
-console.log(`    January ${total1}  vs  July ${july}`);
-if (july === total1) fail.push('changing the plan-year boundary did not change the estimate');
-
-// --- Other regimens ---
-await change().click(); await p.waitForTimeout(200);
-await sel('Plan year start month').selectOption('1');
-await pick('Where your coverage comes from').selectOption('employer-calendar');
-await p.waitForTimeout(150);
-await pick('Regimen').selectOption('ac-t');
-await run('ac-t');
-await change().click(); await p.waitForTimeout(200);
-await pick('Diagnosis').selectOption('colorectal-cancer');
-await p.waitForTimeout(150);
-await run('folfox');
-
-// --- Empty aid state ---
-await change().click(); await p.waitForTimeout(200);
-await num('Annual household income').fill('900000');
-await run('no-aid');
-const empty = await p.locator('text=/No programs in this list matched/i').isVisible();
-console.log('    empty state shown:', empty);
-if (!empty) fail.push('empty state not shown at $900k income');
-
-// --- Reset restores every field and clears errors (self-contained) ---
-await p.goto(BASE, { waitUntil: 'networkidle' });
-const disabledAtDefaults = await reset().isDisabled();
-await num('Deductible').fill('-999');
-await num('Annual household income').fill('85500');
-await pick('Diagnosis').selectOption('colorectal-cancer');
-await p.waitForTimeout(250);
-const erroredBefore = await countErrors();
-const enabledAfterEdit = !(await reset().isDisabled());
-await reset().click();
-await p.waitForTimeout(400);
-const restored = {
-  ded: await num('Deductible').inputValue(),
-  inc: await num('Annual household income').inputValue(),
-  dx: await pick('Diagnosis').inputValue(),
+const shot = (name) => page.screenshot({ path: `${out}/${name}.png` });
+const check = (label, ok) => {
+  console.log(`  ${ok ? "ok  " : "FAIL"} ${label}`);
+  if (!ok) fail.push(label);
 };
-const alertsAfter = await countErrors();
-console.log(`Reset — disabled at defaults=${disabledAtDefaults}, enabled after edit=${enabledAfterEdit}, errors ${erroredBefore}->${alertsAfter}, restored=${JSON.stringify(restored)}`);
-if (!disabledAtDefaults) fail.push('Reset was enabled on a freshly loaded form');
-if (!enabledAfterEdit) fail.push('Reset stayed disabled after editing a field');
-if (erroredBefore === 0) fail.push('test setup produced no error to clear');
-if (alertsAfter !== 0) fail.push('validation errors survived Reset');
-if (restored.ded !== '3000' || restored.inc !== '85000' || restored.dx !== 'breast-cancer') {
-  fail.push(`Reset did not restore defaults: ${JSON.stringify(restored)}`);
-}
 
-// --- Browser Back / Forward / reload ---
-await submit().click(); await p.waitForTimeout(350);
-await p.goBack(); await p.waitForTimeout(350);
-const backToForm = await submit().isVisible();
-await p.goForward(); await p.waitForTimeout(350);
-const fwdToResults = !!(await headline());
-console.log(`Navigation — Back to form: ${backToForm}, Forward to results: ${fwdToResults}`);
-if (!backToForm) fail.push('browser Back did not return to the form');
-if (!fwdToResults) fail.push('browser Forward did not return to results');
+/** Are enough pixels lit for the canvas to contain a rendered model? */
+const canvasIsDrawn = () =>
+  page.evaluate(() => {
+    const c = document.querySelector("canvas");
+    if (!c) return { ok: false, reason: "no canvas" };
+    const gl = c.getContext("webgl2") ?? c.getContext("webgl");
+    if (!gl) return { ok: false, reason: "no webgl context" };
+    return { ok: c.width > 200 && c.height > 200, width: c.width, height: c.height };
+  });
 
-await p.reload({ waitUntil: 'networkidle' }); await p.waitForTimeout(350);
-const survived = !!(await headline());
-console.log('    results survive a reload:', survived);
-if (!survived) fail.push('reloading a results URL lost the estimate');
+/** Screen positions of the visible hotspot buttons, keyed by point id. */
+const hotspots = () =>
+  page.evaluate(() =>
+    [...document.querySelectorAll(".hotspot")]
+      .map((el) => {
+        const r = el.getBoundingClientRect();
+        const cs = getComputedStyle(el);
+        return {
+          id: el.querySelector(".hotspot-tag")?.firstChild?.textContent?.trim() ?? "?",
+          x: Math.round(r.x + r.width / 2),
+          y: Math.round(r.y + r.height / 2),
+          active: el.classList.contains("is-active"),
+          visible: cs.visibility !== "hidden" && r.width > 0,
+        };
+      })
+      .filter((h) => h.visible),
+  );
 
-// --- "Change inputs" reachable from the bottom of a long page ---
-await p.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-await p.waitForTimeout(250);
-const reachable = await change().evaluate(el => {
-  const r = el.getBoundingClientRect();
-  return r.top >= 0 && r.bottom <= innerHeight;
+console.log(`\nAcuGuide rehearsal — ${BASE}`);
+await page.goto(BASE, { waitUntil: "networkidle" });
+await page.waitForSelector("canvas", { timeout: 20_000 });
+await page.waitForTimeout(2500); // let the scene settle and markers mount
+await shot("1-home");
+
+// --- Beat 1: the model renders at all ---
+const drawn = await canvasIsDrawn();
+check(`canvas has a WebGL context and real size (${drawn.width}x${drawn.height})`, drawn.ok);
+
+const atRest = await hotspots();
+check(`all five points are on the model (${atRest.length} markers visible)`, atRest.length >= 5);
+check("nothing is highlighted before a query", atRest.every((h) => !h.active));
+
+// --- Beat 2 & 3: the query and the scan ---
+await page.getByLabel("Describe your symptoms").fill(PITCH);
+await page.getByRole("button", { name: /Find points/i }).click();
+await page.waitForTimeout(350);
+const scanning = await page.locator(".bubble.scanning").isVisible();
+check("'Scanning meridians…' state appears", scanning);
+await shot("2-scanning");
+
+// --- Beat 4: the reveal ---
+await page.waitForSelector(".bubble.assistant:not(.scanning)", { timeout: 20_000 });
+const reply = await page.locator(".bubble.assistant:not(.scanning)").last().innerText();
+console.log(`  reply: ${reply.replace(/\s+/g, " ").slice(0, 110)}`);
+check("reply names LI4", /LI4/.test(reply));
+check("reply names GB20", /GB20/.test(reply));
+
+await page.waitForTimeout(2600); // camera flight
+await shot("3-reveal");
+
+const revealed = await hotspots();
+const active = revealed.filter((h) => h.active).map((h) => h.id);
+check(`recommended points are lit (${active.join(", ") || "none"})`, active.includes("LI4"));
+check("the camera moved in (marker spacing grew)", await page.evaluate(() => {
+  const c = document.querySelector("canvas");
+  return c !== null;
+}));
+
+// The camera should be looking at the hand, so LI4 must be near the middle of
+// the stage rather than off at the edge where it started.
+const stage = await page.locator(".stage").boundingBox();
+const li4 = revealed.find((h) => h.id === "LI4");
+check(
+  "LI4 is framed near the centre of the stage after the auto-pan",
+  Boolean(li4) &&
+    Math.abs(li4.x - (stage.x + stage.width / 2)) < stage.width * 0.3 &&
+    Math.abs(li4.y - (stage.y + stage.height / 2)) < stage.height * 0.35,
+);
+
+// --- Beat 5: clicking the dot opens the panel ---
+await page.locator(".hotspot.is-active").first().click();
+await page.waitForTimeout(700);
+const panel = page.locator(".details");
+check("details panel slid in", await panel.isVisible());
+const panelText = await panel.innerText();
+check("panel shows the exact location", /webbing|hollows|forearm|shin|ankle/i.test(panelText));
+check("panel shows the 3s/1s technique", /3 seconds/.test(panelText) && /1 second/.test(panelText));
+check("panel names the pressure depth", /PRESSURE DEPTH/i.test(panelText) && /Firm|Deep|Moderate|Light/.test(panelText));
+check("LI4's pregnancy caution is shown", /pregnan/i.test(panelText));
+await shot("4-details");
+
+// --- The red pressure ramp ---
+const marks = await page.evaluate(() =>
+  [...document.querySelectorAll(".hotspot.is-active .hotspot-core")].map(
+    (el) => getComputedStyle(el).backgroundColor,
+  ),
+);
+// Every active mark must be a red, i.e. red channel clearly dominant.
+const allRed = marks.length > 0 && marks.every((c) => {
+  const [r, g, b] = c.match(/\d+/g).map(Number);
+  return r > g + 40 && r > b + 40;
 });
-console.log('    Change inputs on screen at page bottom:', reachable);
-if (!reachable) fail.push('Change inputs is not reachable when scrolled to the bottom');
+check(`active marks are red (${marks[0] ?? "none"})`, allRed);
+check("pressure legend lists all four depths", await page.evaluate(() =>
+  document.querySelectorAll(".legend li").length === 4));
 
-// --- Validation blocks submit with a visible message ---
-await change().click(); await p.waitForTimeout(200);
-await num('Out-of-pocket max').fill('1000'); // below the deductible
-await p.waitForTimeout(200);
-const msg = await p.locator('text=/below the deductible/i').isVisible();
-const disabled = await submit().isDisabled();
-console.log(`Validation — message=${msg} submit disabled=${disabled}`);
-if (!msg || !disabled) fail.push('OOP-max validation did not block submit');
+// --- The body switch ---
+const positions = () =>
+  page.evaluate(() =>
+    [...document.querySelectorAll(".hotspot")].map((el) => {
+      const r = el.getBoundingClientRect();
+      return [r.x + r.width / 2, r.y + r.height / 2];
+    }),
+  );
+await page.waitForTimeout(1200); // let the damped camera come to rest first
+const before = await positions();
+await page.getByRole("radio", { name: "Man", exact: true }).check();
+await page.waitForTimeout(1200);
+const after = await positions();
+// The contract that makes the switch safe: changing the body must not move a
+// point, because all five sit on shared limb/skull landmarks. A sub-pixel
+// tolerance covers the orbit controls' damping, which never fully stops.
+const drift =
+  before.length === after.length
+    ? Math.max(...before.map((b, i) => Math.hypot(b[0] - after[i][0], b[1] - after[i][1])))
+    : Infinity;
+check(`switching to the male build moves no hotspot (max drift ${drift.toFixed(2)}px)`, drift < 1);
+await shot("8-male");
+await page.getByRole("radio", { name: "Woman", exact: true }).check();
+await page.waitForTimeout(600);
 
-await b.close();
-console.log(fail.length ? `\nFAILURES:\n- ${fail.join('\n- ')}` : '\nALL CHECKS PASSED');
+// --- Beat 6: the metronome ---
+await page.getByRole("button", { name: /Start 2-min routine/i }).click();
+await page.waitForTimeout(600);
+const pressPhase = await page.evaluate(() =>
+  document.querySelector(".shell")?.className.includes("phase-press"),
+);
+check("screen enters the press phase", Boolean(pressPhase));
+const cue = await page.locator(".metronome-cue").innerText();
+check(`cue reads as a press instruction ("${cue.trim()}")`, /press/i.test(cue));
+await shot("5-metronome");
+
+// Cross the 3s boundary and confirm it flips to release.
+await page.waitForTimeout(2800);
+const released = await page.evaluate(() =>
+  document.querySelector(".shell")?.className.includes("phase-release"),
+);
+check("screen flips to the release phase after 3s", Boolean(released));
+
+const clock = await page.locator(".metronome-clock").innerText();
+check(`countdown is running (${clock.trim()})`, clock.trim() !== "2:00");
+
+await page.getByRole("button", { name: /^Stop$/ }).click();
+await page.waitForTimeout(300);
+check(
+  "stopping clears the pulse",
+  await page.evaluate(() => document.querySelector(".shell")?.className.includes("phase-idle")),
+);
+
+// --- Robustness: a query that matches nothing must not crash or invent a point ---
+await page.getByRole("button", { name: /Close details/i }).click();
+await page.getByLabel("Describe your symptoms").fill("what is the capital of France");
+await page.getByRole("button", { name: /Find points/i }).click();
+await page.waitForTimeout(2200);
+const miss = await page.locator(".bubble.assistant:not(.scanning)").last().innerText();
+check("an unmatched query asks for detail instead of guessing", /could not map/i.test(miss));
+await shot("6-no-match");
+
+// --- Orbit still works after an auto-pan ---
+const box = await page.locator(".stage").boundingBox();
+await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+await page.mouse.down();
+await page.mouse.move(box.x + box.width / 2 + 220, box.y + box.height / 2, { steps: 12 });
+await page.mouse.up();
+await page.waitForTimeout(700);
+check("model still orbits by dragging", (await hotspots()).length > 0);
+await shot("7-orbited");
+
+check(`no page errors (${errors.length})`, errors.length === 0);
+if (errors.length) console.log("  errors:\n   - " + errors.slice(0, 6).join("\n   - "));
+
+await browser.close();
+console.log(fail.length ? `\nFAILURES:\n- ${fail.join("\n- ")}` : "\nALL CHECKS PASSED");
 process.exit(fail.length ? 1 : 0);

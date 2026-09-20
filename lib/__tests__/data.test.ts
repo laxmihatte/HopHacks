@@ -1,128 +1,82 @@
 import { describe, expect, it } from "vitest";
-import { grossCostForCycle } from "../calculator";
-import { isValidIsoDate } from "../validation";
-import type { FplTable, InsuranceType, Program, Regimen } from "../types";
-import fplData from "../../data/fpl.json";
-import programData from "../../data/programs.json";
-import regimenData from "../../data/regimens.json";
+import { ACUPOINTS, POINT_IDS, coercePointIds, getPoint, isPointId } from "@/lib/acupoints";
+import { ROUTER_TOOL, systemPrompt } from "@/lib/prompt";
 
-const regimens = regimenData as Regimen[];
-const programs = programData as Program[];
-const fpl = fplData as FplTable;
-
-const INSURANCE: InsuranceType[] = ["commercial", "medicare", "medicaid", "uninsured"];
-const DIAGNOSES = new Set(regimens.map((r) => r.diagnosis));
-
-describe("regimens.json is internally consistent", () => {
-  it("has unique ids", () => {
-    const ids = regimens.map((r) => r.id);
-    expect(new Set(ids).size).toBe(ids.length);
+describe("the acupoint database", () => {
+  it("contains the five MVP points", () => {
+    expect(POINT_IDS.sort()).toEqual(["GB20", "LI4", "PC6", "SP6", "ST36"]);
   });
 
-  it("has a sane schedule and at least one drug", () => {
-    for (const r of regimens) {
-      expect(r.cycleCount, r.id).toBeGreaterThan(0);
-      expect(Number.isInteger(r.cycleCount), r.id).toBe(true);
-      expect(r.cycleLengthDays, r.id).toBeGreaterThan(0);
-      expect(r.drugs.length, r.id).toBeGreaterThan(0);
-      expect(r.adminCostPerCycle, r.id).toBeGreaterThanOrEqual(0);
-    }
-  });
+  for (const id of POINT_IDS) {
+    const p = ACUPOINTS[id];
 
-  it("prices every drug with a positive limit and billing unit", () => {
-    for (const r of regimens) {
-      for (const d of r.drugs) {
-        expect(d.paymentLimit, `${r.id}/${d.hcpcs}`).toBeGreaterThan(0);
-        expect(d.billingUnit, `${r.id}/${d.hcpcs}`).toBeGreaterThan(0);
-        expect(d.dosePerCycle, `${r.id}/${d.hcpcs}`).toBeGreaterThan(0);
-        expect(d.hcpcs, r.id).toMatch(/^[A-Z]\d{4}$/);
+    it(`${id} has every field the details panel renders`, () => {
+      expect(p.id).toBe(id);
+      for (const key of ["name", "translation", "meridian", "region", "location", "technique"] as const) {
+        expect(p[key], `${id}.${key}`).toBeTruthy();
       }
+      expect(p.symptoms.length).toBeGreaterThanOrEqual(3);
+      expect(p.coords3D).toHaveLength(3);
+      expect(p.cameraTarget).toHaveLength(3);
+      expect(typeof p.bilateral).toBe("boolean");
+    });
+
+    it(`${id} states the 3s press / 1s release rhythm the metronome keeps`, () => {
+      // The panel text and the timer must not contradict each other on stage.
+      expect(p.technique).toMatch(/3 seconds/);
+      expect(p.technique).toMatch(/1 second/);
+    });
+
+    it(`${id} has lowercase symptom keys, so matching is predictable`, () => {
+      for (const s of p.symptoms) expect(s).toBe(s.toLowerCase());
+    });
+  }
+
+  it("flags the two points contraindicated in pregnancy", () => {
+    expect(ACUPOINTS.LI4.caution).toMatch(/pregnan/i);
+    expect(ACUPOINTS.SP6.caution).toMatch(/pregnan/i);
+  });
+});
+
+describe("id coercion", () => {
+  it("accepts approved ids", () => {
+    expect(isPointId("LI4")).toBe(true);
+    expect(getPoint("LI4").name).toBe("He Gu");
+  });
+
+  it("rejects anything outside the database", () => {
+    for (const bad of ["li4", "LI40", "LU7", "", "__proto__", "toString", null, 7, {}]) {
+      expect(isPointId(bad), String(bad)).toBe(false);
     }
   });
 
-  it("only schedules drugs into cycles that exist", () => {
-    for (const r of regimens) {
-      for (const d of r.drugs) {
-        if (!d.cycles) continue;
-        expect(d.cycles.length, `${r.id}/${d.hcpcs}`).toBeGreaterThan(0);
-        for (const c of d.cycles) {
-          expect(Number.isInteger(c), `${r.id}/${d.hcpcs}`).toBe(true);
-          expect(c, `${r.id}/${d.hcpcs}`).toBeGreaterThanOrEqual(1);
-          expect(c, `${r.id}/${d.hcpcs}`).toBeLessThanOrEqual(r.cycleCount);
-        }
-      }
-    }
+  it("drops hallucinated ids and de-duplicates the rest", () => {
+    expect(coercePointIds(["LI4", "LU7", "LI4", "GB20", 42, null])).toEqual(["LI4", "GB20"]);
   });
 
-  it("gives every cycle of every regimen a positive cost", () => {
-    for (const r of regimens) {
-      for (let i = 1; i <= r.cycleCount; i++) {
-        expect(grossCostForCycle(r, i), `${r.id} cycle ${i}`).toBeGreaterThan(0);
-      }
-    }
-  });
-
-  it("cites a source for both the drug prices and the admin figure", () => {
-    for (const r of regimens) {
-      expect(r.sourceNote, r.id).toMatch(/CMS/);
-      expect(r.adminSourceNote.length, r.id).toBeGreaterThan(10);
+  it("returns an empty list for non-arrays", () => {
+    for (const bad of [null, undefined, "LI4", {}, 0]) {
+      expect(coercePointIds(bad)).toEqual([]);
     }
   });
 });
 
-describe("programs.json is internally consistent", () => {
-  it("has unique ids", () => {
-    const ids = programs.map((p) => p.id);
-    expect(new Set(ids).size).toBe(ids.length);
+describe("the router prompt", () => {
+  it("lists every approved id, so the model cannot be blamed for missing one", () => {
+    const prompt = systemPrompt();
+    for (const id of POINT_IDS) expect(prompt).toContain(id);
   });
 
-  it("meets the PRD's floor of ten real programs", () => {
-    expect(programs.length).toBeGreaterThanOrEqual(10);
+  it("forbids the model from writing location or technique text", () => {
+    expect(systemPrompt()).toMatch(/never write location or technique/i);
   });
 
-  it("uses only known insurance types", () => {
-    for (const p of programs) {
-      expect(p.insuranceTypes.length, p.id).toBeGreaterThan(0);
-      for (const t of p.insuranceTypes) expect(INSURANCE, p.id).toContain(t);
-    }
+  it("constrains the tool schema to the approved ids", () => {
+    const enumerated = ROUTER_TOOL.input_schema.properties.recommendedPoints.items.properties.id.enum;
+    expect([...enumerated].sort()).toEqual(POINT_IDS.sort());
   });
 
-  it("uses a real https url", () => {
-    for (const p of programs) expect(p.url, p.id).toMatch(/^https:\/\//);
-  });
-
-  it("carries a valid, non-future verification date", () => {
-    for (const p of programs) {
-      expect(isValidIsoDate(p.lastVerified), p.id).toBe(true);
-      expect(p.lastVerified <= "2100-01-01", p.id).toBe(true);
-    }
-  });
-
-  it("has a sane FPL gate and a positive award cap", () => {
-    for (const p of programs) {
-      expect(p.maxFplPercent, p.id).toBeGreaterThan(0);
-      expect(p.maxFplPercent, p.id).toBeLessThanOrEqual(1000);
-      expect(p.awardCap, p.id).toBeGreaterThan(0);
-      expect(["open", "closed"], p.id).toContain(p.status);
-    }
-  });
-
-  it("only names diagnoses the app can actually select, or is agnostic", () => {
-    // Funds for diagnoses outside the app's regimen list are allowed, but they
-    // must never match — this pins that they are deliberate, not typos.
-    const offRoster = programs
-      .filter((p) => p.diagnoses.length > 0 && !p.diagnoses.some((d) => DIAGNOSES.has(d)))
-      .map((p) => p.id);
-    expect(offRoster).toEqual(["lls-patient-aid"]);
-  });
-});
-
-describe("fpl.json reproduces the published 2026 table", () => {
-  it("carries the 2026 contiguous-48 figures", () => {
-    expect(fpl.base).toBe(15960);
-    expect(fpl.increment).toBe(5680);
-    expect(fpl.year).toBe(2026);
-    expect(fpl.region).toBe("contiguous-48");
-    expect(isValidIsoDate(fpl.effective)).toBe(true);
+  it("caps the model at three points, matching the router", () => {
+    expect(ROUTER_TOOL.input_schema.properties.recommendedPoints.maxItems).toBe(3);
   });
 });

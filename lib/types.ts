@@ -1,173 +1,67 @@
-// Shared interfaces. Imports nothing — not React, not Next, not the data files.
+import type { Vec3 } from "./anatomy";
 
-export type InsuranceType = "commercial" | "medicare" | "medicaid" | "uninsured";
+export type PointId = "LI4" | "GB20" | "PC6" | "ST36" | "SP6";
 
-export interface Drug {
-  /** HCPCS J-code. Joins to the CMS Medicare Part B Payment Limit File. */
-  hcpcs: string;
-  name: string;
-  /** Dose administered per cycle, in the same measure as `billingUnit`. */
-  dosePerCycle: number;
-  /** The quantity the CMS payment limit is quoted per. */
-  billingUnit: number;
-  /** Payment limit per billing unit, copied from the CMS file at build time. */
-  paymentLimit: number;
-  /**
-   * 1-indexed cycle numbers in which this drug is given. Omit for every cycle.
-   *
-   * Extension to the schema in the PRD, which assumes one flat drug list per
-   * regimen. AC-T is sequential — doxorubicin and cyclophosphamide in cycles
-   * 1-4, paclitaxel in cycles 5-8 — so a flat list would bill all three drugs
-   * in all eight cycles and overstate gross cost by roughly 2x.
-   */
-  cycles?: number[];
-}
-
-export interface Regimen {
-  id: string;
-  name: string;
-  diagnosis: string;
-  cycleCount: number;
-  cycleLengthDays: number;
-  drugs: Drug[];
-  /** Flat infusion-visit figure, added once per cycle. */
-  adminCostPerCycle: number;
-  sourceNote: string;
-  adminSourceNote: string;
-}
-
-export interface Program {
-  id: string;
-  name: string;
-  url: string;
-  maxFplPercent: number;
-  /** Empty array means diagnosis-agnostic. */
-  diagnoses: string[];
-  insuranceTypes: InsuranceType[];
-  /** Annual maximum award, in dollars. */
-  awardCap: number;
-  status: "open" | "closed";
-  /** ISO date. Surfaced in the UI. */
-  lastVerified: string;
-}
-
-export interface FplTable {
-  base: number;
-  increment: number;
-  year: number;
-  region: string;
-  effective: string;
-  source: string;
-}
-
-/** The single object the engine consumes. */
-export interface EstimateInput {
-  regimenId: string;
-  /** ISO yyyy-mm-dd. */
-  startDate: string;
-  deductible: number;
-  /** Fraction, not percent: 0.2 for 20%. */
-  coinsuranceRate: number;
-  /**
-   * The month and day the plan year restarts, as "MM-DD".
-   *
-   * Almost every tool assumes January 1. That is right for Medicare and for
-   * individual marketplace plans, but an employer-sponsored plan follows the
-   * employer's benefit year, which is frequently July 1, October 1, or the
-   * employer's fiscal year start.
-   */
-  planYearStart: string;
-  oopMax: number;
-  householdSize: number;
-  income: number;
-  insuranceType: InsuranceType;
-}
-
-export interface CycleResult {
-  /** 1-indexed. */
-  index: number;
-  /** ISO yyyy-mm-dd. */
-  date: string;
-  planYear: number;
-  /** True when the accumulators were zeroed before this cycle was applied. */
-  planYearReset: boolean;
-  /** ISO date of the plan-year boundary that caused the reset, else null. */
-  resetOn: string | null;
-  grossCost: number;
-  deductibleApplied: number;
-  coinsuranceApplied: number;
-  patientPays: number;
-  cumulativePatientPays: number;
-}
-
-export interface Estimate {
-  cycles: CycleResult[];
-  totalGross: number;
-  totalPatientPays: number;
-}
-
-export interface AidResult {
-  matched: Program[];
-  /** The single largest award cap among matched programs, or 0 if none. */
-  bestAwardCap: number;
-  fplPercent: number;
-  guideline: number;
-  /** Cumulative out-of-pocket after aid, index-aligned to `Estimate.cycles`. */
-  afterAidCumulative: number[];
-  totalAfterAid: number;
-}
+/** How hard to press. Ordered: light < moderate < firm < deep. */
+export type Pressure = "light" | "moderate" | "firm" | "deep";
 
 /**
- * The form's raw, editable state. Numeric fields are strings so a cleared
- * field stays cleared instead of silently becoming zero.
+ * Which body the points are shown on. This changes the figure's proportions
+ * only — shoulder-to-hip ratio and chest — never the location of a point,
+ * all five of which sit on the limbs and skull.
  */
-export interface FormState {
-  diagnosis: string;
-  regimenId: string;
-  startDate: string;
-  insuranceType: InsuranceType;
-  /** Which plan-year profile the user picked; drives guidance, not the maths. */
-  coverage: string;
-  /** "MM-DD" — the boundary the engine actually uses. */
-  planYearStart: string;
-  deductible: string;
-  coinsurancePercent: string;
-  oopMax: string;
-  householdSize: string;
-  income: string;
+export type Sex = "male" | "female";
+
+/** Which face of the model the camera has to be on to see the point. */
+export type Approach = "front" | "back";
+
+export interface Acupoint {
+  id: PointId;
+  /** Pinyin name, e.g. "He Gu". */
+  name: string;
+  /** English gloss, e.g. "Union Valley". */
+  translation: string;
+  meridian: string;
+  region: string;
+  /** Lay-language complaints this point is used for; the router matches on these. */
+  symptoms: string[];
+  location: string;
+  technique: string;
+  /** How hard to press, rendered as a red depth ramp on the model. */
+  pressure: Pressure;
+  coords3D: Vec3;
+  cameraTarget: Vec3;
+  /** How far back the camera sits from the target. Small points need to be closer. */
+  cameraDistance: number;
+  approach: Approach;
+  /** True when the point exists on both sides and should render a mirrored twin. */
+  bilateral: boolean;
+  caution: string | null;
 }
 
-/** One candidate start date, priced end to end. */
-export interface StartDateOption {
-  startDate: string;
-  totalGross: number;
-  totalPatientPays: number;
-  totalAfterAid: number;
-  /** How many times the deductible is charged over the course. */
-  deductiblesCharged: number;
-  /** Plan-year boundaries the course of treatment crosses. */
-  boundariesCrossed: number;
+/** One point the router chose, with the evidence for why. */
+export interface Match {
+  id: PointId;
+  /** The user's own words that triggered this point, for display in the chat. */
+  matched: string[];
 }
 
-export interface StartDateSweep {
-  options: StartDateOption[];
-  cheapest: StartDateOption;
-  costliest: StartDateOption;
-  /** What choosing the cheapest date saves against the costliest. */
-  spread: number;
-  /** The date the user originally entered, priced the same way. */
-  chosen: StartDateOption | null;
-  /** What moving from the chosen date to the cheapest one saves. */
-  savingsVsChosen: number;
+export type RouterSource = "claude" | "keyword";
+
+export interface Recommendation {
+  points: Acupoint[];
+  matches: Match[];
+  /** Which router produced this — surfaced in the UI so the demo never lies. */
+  source: RouterSource;
+  /** Present when the model was asked but could not be used. */
+  note?: string;
 }
 
-/** What a coverage type typically implies about the plan-year boundary. */
-export interface PlanYearProfile {
+/** Chat transcript entry. */
+export interface ChatMessage {
   id: string;
-  label: string;
-  /** "MM-DD" when the boundary is reliably known, else null. */
-  typicalStart: string | null;
-  confidence: "regulated" | "common" | "varies";
-  note: string;
-  whereToCheck: string;
+  role: "user" | "assistant";
+  text: string;
+  /** Point ids referenced by an assistant turn, rendered as inline chips. */
+  pointIds?: PointId[];
 }

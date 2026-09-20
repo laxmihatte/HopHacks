@@ -1,18 +1,21 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 
-// Self-hosted at build time, so the app still renders correctly offline.
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-sans",
-  display: "swap",
-});
+// Self-hosted at build time, so the demo does not depend on a font CDN over
+// conference wifi.
+const inter = Inter({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
 
 export const metadata: Metadata = {
-  title: "Out-of-Pocket Cost Estimator & Aid Navigator",
+  title: "AcuGuide AI — Symptom to pressure point",
   description:
-    "Estimate cycle-by-cycle out-of-pocket cancer treatment cost from published CMS payment limits, find the assistance programs a household qualifies for, and find the cheapest clinically acceptable start date.",
+    "Describe a symptom and see exactly where to press, how hard, and at what rhythm, on an interactive 3D model.",
+};
+
+export const viewport: Viewport = {
+  themeColor: "#070b14",
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

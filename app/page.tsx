@@ -1,279 +1,197 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import AssumptionsBlock from "@/components/AssumptionsBlock";
-import CostChart from "@/components/CostChart";
-import CycleTable from "@/components/CycleTable";
-import DisclaimerBanner from "@/components/DisclaimerBanner";
-import InputForm from "@/components/InputForm";
-import ProgramList from "@/components/ProgramList";
-import StartDateOptimizer from "@/components/StartDateOptimizer";
-import { estimate as runEstimate } from "@/lib/calculator";
-import { navigateAid } from "@/lib/matcher";
-import { decodeForm, encodeForm } from "@/lib/url";
-import { parseField, validateForm } from "@/lib/validation";
-import type { EstimateInput, FormState, FplTable, Program, Regimen } from "@/lib/types";
-import fplData from "@/data/fpl.json";
-import programData from "@/data/programs.json";
-import regimenData from "@/data/regimens.json";
+import dynamic from "next/dynamic";
+import { useCallback, useEffect, useRef, useState } from "react";
+import ChatPanel from "@/components/ChatPanel";
+import DetailsPanel from "@/components/DetailsPanel";
+import type { Phase } from "@/components/Metronome";
+import { ACUPOINTS } from "@/lib/acupoints";
+import { BUILD } from "@/lib/anatomy";
+import { PRESSURE, PRESSURE_ORDER, step } from "@/lib/pressure";
+import type { ChatMessage, PointId, RouterSource, Sex } from "@/lib/types";
 
-const REGIMENS = regimenData as Regimen[];
-const PROGRAMS = programData as Program[];
-const FPL = fplData as FplTable;
+// The 3D scene touches window/WebGL on import, so it is client-only. The
+// skeleton keeps the layout from jumping while the chunk loads.
+const Scene = dynamic(() => import("@/components/Scene"), {
+  ssr: false,
+  loading: () => <div className="scene-loading">Preparing model…</div>,
+});
 
-const isKnownRegimen = (id: string, diagnosis: string) =>
-  REGIMENS.some((r) => r.id === id && r.diagnosis === diagnosis);
+/** The scan animation is the pitch's "AI magic" beat. A sub-200ms response
+ *  would flash it past the judges, so hold the floor at just under a second. */
+const MIN_SCAN_MS = 900;
 
-const money = (n: number) =>
-  n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+interface ApiResponse {
+  points?: { id: PointId }[];
+  matches?: { id: PointId }[];
+  reply?: string;
+  source?: RouterSource;
+  note?: string;
+  error?: string;
+}
 
-const monthDay = (md: string) => {
-  const [m, d] = md.split("-").map(Number);
-  return new Date(Date.UTC(2001, m - 1, d)).toLocaleDateString("en-US", {
-    month: "long", day: "numeric", timeZone: "UTC",
-  });
-};
+let seq = 0;
+const nextId = () => `m${++seq}`;
 
-/** Pre-filled with the demo input, so the page is never an empty form. */
-const DEFAULTS: FormState = {
-  diagnosis: "breast-cancer",
-  regimenId: "tchp",
-  startDate: "2026-10-15",
-  insuranceType: "commercial",
-  coverage: "employer-calendar",
-  planYearStart: "01-01",
-  deductible: "3000",
-  coinsurancePercent: "20",
-  oopMax: "9000",
-  householdSize: "4",
-  income: "85000",
-};
+export default function Home() {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [scanning, setScanning] = useState(false);
+  const [recommended, setRecommended] = useState<PointId[]>([]);
+  const [selectedId, setSelectedId] = useState<PointId | null>(null);
+  const [focusId, setFocusId] = useState<PointId | null>(null);
+  const [source, setSource] = useState<RouterSource | null>(null);
+  const [aiConfigured, setAiConfigured] = useState<boolean | null>(null);
+  const [phase, setPhase] = useState<Phase>("idle");
+  const [sex, setSex] = useState<Sex>("female");
+  const inFlight = useRef(0);
 
-export default function Page() {
-  const [form, setForm] = useState<FormState>(DEFAULTS);
-  const [submitted, setSubmitted] = useState<FormState | null>(null);
-
-  const show = useCallback((next: FormState | null, mode: "push" | "replace" = "push") => {
-    setSubmitted(next);
-    if (next) setForm(next);
-    if (typeof window !== "undefined") {
-      const url = next
-        ? `${window.location.pathname}?${encodeForm(next)}`
-        : window.location.pathname;
-      window.history[mode === "push" ? "pushState" : "replaceState"]({}, "", url);
-      window.scrollTo({ top: 0 });
-    }
-  }, []);
-
+  // Tells the user honestly whether they are getting the model or the matcher,
+  // before they type anything.
   useEffect(() => {
-    const fromUrl = () => {
-      const decoded = decodeForm(window.location.search, isKnownRegimen);
-      setSubmitted(decoded);
-      if (decoded) setForm(decoded);
+    let live = true;
+    fetch("/api/recommend")
+      .then((r) => r.json())
+      .then((d: { aiConfigured?: boolean }) => {
+        if (live) setAiConfigured(Boolean(d.aiConfigured));
+      })
+      .catch(() => live && setAiConfigured(false));
+    return () => {
+      live = false;
     };
-    fromUrl();
-    window.addEventListener("popstate", fromUrl);
-    return () => window.removeEventListener("popstate", fromUrl);
   }, []);
 
-  const errors = validateForm(form);
-  const canReset = (Object.keys(DEFAULTS) as (keyof FormState)[]).some(
-    (k) => form[k] !== DEFAULTS[k],
-  );
+  const submit = useCallback(async (text: string) => {
+    const token = ++inFlight.current;
+    setMessages((m) => [...m, { id: nextId(), role: "user", text }]);
+    setScanning(true);
+    setSelectedId(null);
 
-  const result = useMemo(() => {
-    if (!submitted) return null;
-    const regimen = REGIMENS.find((r) => r.id === submitted.regimenId);
-    if (!regimen) return { error: "That regimen is no longer available." } as const;
-
-    const deductible = parseField(submitted.deductible);
-    const coinsurancePercent = parseField(submitted.coinsurancePercent);
-    const oopMax = parseField(submitted.oopMax);
-    const householdSize = parseField(submitted.householdSize);
-    const income = parseField(submitted.income);
-    if (
-      deductible === null || coinsurancePercent === null || oopMax === null ||
-      householdSize === null || income === null
-    ) {
-      return { error: "Some inputs could not be read as numbers." } as const;
-    }
-
-    const input: EstimateInput = {
-      regimenId: submitted.regimenId,
-      startDate: submitted.startDate,
-      deductible,
-      coinsuranceRate: coinsurancePercent / 100,
-      oopMax,
-      householdSize,
-      income,
-      insuranceType: submitted.insuranceType,
-      planYearStart: submitted.planYearStart,
-    };
-
+    const started = performance.now();
+    let data: ApiResponse;
     try {
-      const est = runEstimate(input, regimen);
-      const aid = navigateAid(est, PROGRAMS, FPL, {
-        income,
-        householdSize,
-        diagnosis: regimen.diagnosis,
-        insuranceType: submitted.insuranceType,
+      const res = await fetch("/api/recommend", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ symptoms: text }),
       });
-      return {
-        regimen, est, aid, input,
-        inputs: { deductible, coinsurancePercent, oopMax, householdSize, income },
-      };
-    } catch (e) {
-      return {
-        error: e instanceof Error ? e.message : "This estimate could not be calculated.",
-      } as const;
+      data = (await res.json()) as ApiResponse;
+    } catch {
+      data = { error: "I could not reach the router. Check the dev server and try again." };
     }
-  }, [submitted]);
 
-  const ok = result && !("error" in result) ? result : null;
-  const hasAid = !!ok && ok.aid.bestAwardCap > 0;
-  const crosses = !!ok && ok.est.cycles.some((c) => c.planYearReset);
+    const held = MIN_SCAN_MS - (performance.now() - started);
+    if (held > 0) await new Promise((r) => setTimeout(r, held));
+    // A second submission landed while this one was in the air; drop this one.
+    if (token !== inFlight.current) return;
+
+    setScanning(false);
+
+    if (data.error) {
+      setMessages((m) => [...m, { id: nextId(), role: "assistant", text: data.error! }]);
+      return;
+    }
+
+    const ids = (data.points ?? []).map((p) => p.id);
+    setRecommended(ids);
+    setSource(data.source ?? null);
+    setFocusId(ids[0] ?? null);
+    setMessages((m) => [
+      ...m,
+      {
+        id: nextId(),
+        role: "assistant",
+        text: [data.reply, data.note].filter(Boolean).join(" "),
+        pointIds: ids,
+      },
+    ]);
+  }, []);
+
+  const select = useCallback((id: PointId) => {
+    setSelectedId(id);
+    setFocusId(id);
+  }, []);
+
+  const point = selectedId ? ACUPOINTS[selectedId] : null;
+  // The screen pulse takes the colour of the point being pressed, so the
+  // rhythm and the depth are the same signal rather than two competing ones.
+  const pulse = point ? step(point.pressure) : null;
 
   return (
-    <div className="relative min-h-screen">
-      <div className="glow" aria-hidden="true" style={ok ? { opacity: 0.45 } : undefined} />
-      <div className="layer sticky top-0 z-30 backdrop-blur-sm">
-        <DisclaimerBanner />
-        {ok && (
-          <div className="border-b border-[var(--rule)] bg-[var(--card)]/85">
-            <div className="mx-auto flex max-w-[68rem] flex-wrap items-center gap-x-6 gap-y-1.5 px-6 py-2.5 text-[13px]">
-              <span className="font-medium">{ok.regimen.name.split(" (")[0]}</span>
-              <span className="tnum hidden text-[var(--ink-2)] sm:inline">
-                {ok.regimen.cycleCount} cycles from {submitted!.startDate}
-              </span>
-              <span className="tnum hidden text-[var(--ink-2)] lg:inline">
-                {money(ok.inputs.deductible)} deductible · {ok.inputs.coinsurancePercent}%
-                · {money(ok.inputs.oopMax)} max
-              </span>
-              <span className="hidden text-[var(--ink-2)] lg:inline">
-                Plan year restarts {monthDay(submitted!.planYearStart)}
-              </span>
-              <button
-                type="button"
-                onClick={() => show(null)}
-                className="ml-auto rounded-full border border-[var(--rule-strong)] bg-[var(--card)] px-3.5 py-1 text-[13px] font-medium hover:bg-[var(--sunk)]"
-              >
-                Change inputs
-              </button>
-            </div>
-          </div>
+    <main
+      className={`shell phase-${phase}`}
+      style={
+        pulse
+          ? ({ "--pulse": pulse.color, "--pulse-glow": pulse.glow } as React.CSSProperties)
+          : undefined
+      }
+    >
+      {/* The screen pulse for the metronome. Behind everything, pointer-inert. */}
+      <div className="pulse-veil" aria-hidden="true" />
+
+      <ChatPanel
+        messages={messages}
+        scanning={scanning}
+        source={source}
+        aiConfigured={aiConfigured}
+        onSubmit={(t) => void submit(t)}
+        onPick={select}
+      />
+
+      <div className="stage">
+        <Scene
+          recommended={recommended}
+          selectedId={selectedId}
+          focusId={focusId}
+          scanning={scanning}
+          sex={sex}
+          onSelect={select}
+        />
+        <fieldset className="body-switch">
+          <legend className="sr-only">Body</legend>
+          {(Object.keys(BUILD) as Sex[]).map((s) => (
+            <label key={s} className={sex === s ? "is-on" : undefined}>
+              <input
+                type="radio"
+                name="sex"
+                value={s}
+                checked={sex === s}
+                onChange={() => setSex(s)}
+              />
+              {BUILD[s].label}
+            </label>
+          ))}
+        </fieldset>
+
+        {/* Sequential ramp: one hue, four lightness steps, ordered. */}
+        <div className="legend" aria-label="Pressure depth scale">
+          <p className="eyebrow">Pressure</p>
+          <ul>
+            {PRESSURE_ORDER.map((level) => (
+              <li key={level}>
+                <span
+                  className="legend-dot"
+                  style={{ background: PRESSURE[level].color }}
+                  aria-hidden="true"
+                />
+                {PRESSURE[level].label}
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="stage-hint">
+          {recommended.length === 0
+            ? "Drag to orbit · scroll to zoom"
+            : "Tap a red point for instructions"}
+        </div>
+        {focusId && (
+          <button type="button" className="btn-ghost reset-view" onClick={() => setFocusId(null)}>
+            Reset view
+          </button>
         )}
       </div>
 
-      <main className="layer mx-auto max-w-[68rem] px-5 pb-20 sm:px-6">
-        {/* Full masthead while choosing; compact once the answer is on screen,
-            so the numbers are not pushed below the fold. */}
-        {ok ? (
-          <header className="pt-8 pb-6">
-            <p className="eyebrow">Cost of care</p>
-            <h1 className="display mt-2 text-[26px] sm:text-[32px]">
-              Your estimate
-            </h1>
-          </header>
-        ) : (
-          <header className="pt-14 pb-12 text-center">
-            <p className="eyebrow">Cost of care</p>
-            <h1 className="display mx-auto mt-4 max-w-[17ch] text-[40px] sm:text-[58px] lg:text-[66px]">
-              What cancer treatment will actually cost you
-            </h1>
-            <p className="mx-auto mt-6 max-w-[56ch] text-[16px] leading-relaxed text-[var(--ink-2)]">
-              Cycle by cycle, from published Medicare payment limits — plus the assistance
-              programs your household already qualifies for, and the cheapest day to begin.
-            </p>
-          </header>
-        )}
-
-        {ok ? (
-          <div role="region" aria-live="polite" aria-label="Your cost estimate" className="space-y-5">
-            <section className="card grid gap-x-10 gap-y-7 p-7 sm:grid-cols-2 sm:p-9">
-              <div>
-                <p className="eyebrow">Your cost before aid</p>
-                <p className="display tnum mt-2 text-[52px]">
-                  {money(ok.est.totalPatientPays)}
-                </p>
-                <p className="tnum mt-2 text-[14px] text-[var(--ink-2)]">
-                  of {money(ok.est.totalGross)} billed to your insurer
-                </p>
-              </div>
-              <div className="sm:border-l sm:border-[var(--rule)] sm:pl-10">
-                <p className="eyebrow">Your cost after aid</p>
-                <p
-                  className="display tnum mt-2 text-[52px]"
-                  style={{ color: hasAid ? "var(--series-2)" : undefined }}
-                >
-                  {money(ok.aid.totalAfterAid)}
-                </p>
-                <p className="tnum mt-2 text-[14px] text-[var(--ink-2)]">
-                  {hasAid
-                    ? `${money(ok.est.totalPatientPays - ok.aid.totalAfterAid)} covered by the largest fund you match`
-                    : "no matching programs — see below"}
-                </p>
-              </div>
-            </section>
-
-            <section className="card mt-5 p-7 sm:p-9">
-              <CostChart
-                estimate={ok.est}
-                afterAidCumulative={ok.aid.afterAidCumulative}
-                hasAid={hasAid}
-              />
-              {crosses && (
-                <p className="mt-5 max-w-[68ch] text-[14px] leading-relaxed text-[var(--ink-2)]">
-                  <span className="font-medium text-[var(--ink)]">
-                    This course of treatment crosses your plan-year boundary.
-                  </span>{" "}
-                  Your deductible and out-of-pocket maximum both restart on{" "}
-                  {monthDay(submitted!.planYearStart)}, so you pay them twice. The section
-                  below prices every other day you could begin.
-                </p>
-              )}
-            </section>
-
-            <StartDateOptimizer
-              input={ok.input}
-              regimen={ok.regimen}
-              awardCap={ok.aid.bestAwardCap}
-            />
-
-            <CycleTable
-              estimate={ok.est}
-              afterAidCumulative={ok.aid.afterAidCumulative}
-              hasAid={hasAid}
-            />
-            <ProgramList aid={ok.aid} />
-            <AssumptionsBlock regimen={ok.regimen} planYearStart={submitted!.planYearStart} />
-          </div>
-        ) : (
-          <>
-            {result && "error" in result && (
-              <div
-                role="alert"
-                className="mb-7 border-l-2 border-[var(--series-2)] py-1 pl-4 text-[14px] leading-relaxed"
-              >
-                <strong className="font-semibold">
-                  This estimate could not be calculated.
-                </strong>{" "}
-                {result.error} Adjust the inputs below and try again.
-              </div>
-            )}
-            <div className="card p-6 sm:p-9">
-            <InputForm
-              value={form}
-              onChange={setForm}
-              onSubmit={() => show(form)}
-              onReset={() => setForm(DEFAULTS)}
-              canReset={canReset}
-              regimens={REGIMENS}
-              errors={errors}
-            />
-            </div>
-          </>
-        )}
-      </main>
-    </div>
+      <DetailsPanel point={point} onClose={() => setSelectedId(null)} onPhase={setPhase} />
+    </main>
   );
 }

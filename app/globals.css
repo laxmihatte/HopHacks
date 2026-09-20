@@ -1,199 +1,925 @@
 @import "tailwindcss";
 
-/*
- * Soft-light surface: a faintly green-grey field carrying a fine grain and a
- * diffuse glow, with white cards floating on it.
- *
- * The two chart series stay blue/orange. That pair is validated for colour
- * vision deficiency; the obvious blue/green alternative collapses to a tritan
- * separation of 4.0, and data encoding is not a branding decision.
- */
 :root {
-  color-scheme: light;
-
-  --field: #f6f5f1;
-  --card: #ffffff;
-  --sunk: #faf9f6;
-
-  --ink: #0d0d0d;
-  --ink-2: #4a4b4c;
-  --ink-3: #7c7e80;
-
-  --rule: #e7e5df;
-  --rule-strong: #d3d0c9;
-
-  --accent: #2b5278;
-  --accent-ink: #ffffff;
-  --accent-soft: #eaf0f7;
-
-  --glow-a: rgba(124, 163, 204, 0.42);
-  --glow-b: rgba(160, 190, 222, 0.34);
-
-  --series-1: #2a78d6;
-  --series-2: #eb6834;
-  --grid: #eceae4;
-
-  --flag-bg: #eef2f8;
-  --flag-rule: #cfdcea;
-  --flag-ink: #2b4661;
-
-  --radius-card: 26px;
-  --radius-field: 12px;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    color-scheme: dark;
-    --field: #111312;
-    --card: #191b1c;
-    --sunk: #1f2223;
-    --ink: #f4f4f3;
-    --ink-2: #aeb0b1;
-    --ink-3: #7e8081;
-    --rule: #292c2d;
-    --rule-strong: #3c4041;
-    --accent: #9cc4e8;
-    --accent-ink: #0a1119;
-    --accent-soft: #17222d;
-    --glow-a: rgba(58, 98, 140, 0.44);
-    --glow-b: rgba(44, 76, 110, 0.36);
-    --series-1: #3987e5;
-    --series-2: #d95926;
-    --grid: #242728;
-    --flag-bg: #17222d;
-    --flag-rule: #2d4258;
-    --flag-ink: #b4d3ef;
-  }
-}
-
-:root[data-theme="dark"] {
   color-scheme: dark;
-  --field: #111312;
-  --card: #191b1c;
-  --sunk: #1f2223;
-  --ink: #f4f4f3;
-  --ink-2: #aeb0b1;
-  --ink-3: #7e8081;
-  --rule: #292c2d;
-  --rule-strong: #3c4041;
-  --accent: #9cc4e8;
-  --accent-ink: #0a1119;
-  --accent-soft: #17222d;
-  --glow-a: rgba(58, 98, 140, 0.44);
-  --glow-b: rgba(44, 76, 110, 0.36);
-  --series-1: #3987e5;
-  --series-2: #d95926;
-  --grid: #242728;
-  --flag-bg: #17222d;
-  --flag-rule: #2d4258;
-  --flag-ink: #b4d3ef;
+
+  --void: #070b14;
+  --panel: rgba(17, 24, 39, 0.72);
+  --panel-solid: #111827;
+  --glass-rule: rgba(148, 178, 214, 0.16);
+
+  --ink: #eef3fa;
+  --ink-2: #a9b8cd;
+  --ink-3: #6d7d94;
+
+  --accent: #22d3ee;
+  --accent-deep: #0e7490;
+  --accent-ink: #04141a;
+  --accent-soft: rgba(34, 211, 238, 0.12);
+
+  --warn: #fbbf24;
+  --radius: 18px;
 }
 
-html {
-  -webkit-text-size-adjust: 100%;
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
 }
 
 body {
-  position: relative;
-  min-height: 100vh;
-  background-color: var(--field);
+  background: var(--void);
   color: var(--ink);
   font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
-  font-size: 15px;
-  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
+  overflow: hidden;
 }
 
-/* Fine grain over the whole field, so the flat colour has some tooth. */
+/* Ambient wash behind the stage, so the void is not flat black. */
 body::before {
   content: "";
   position: fixed;
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  opacity: 0.5;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='160' height='160' filter='url(%23n)' opacity='0.42'/></svg>");
-}
-
-/* The diffuse glow behind the masthead. */
-.glow {
-  position: absolute;
-  inset-inline: 0;
-  top: -180px;
-  height: 620px;
-  z-index: 0;
-  pointer-events: none;
   background:
-    radial-gradient(52% 58% at 50% 62%, var(--glow-a) 0%, transparent 70%),
-    radial-gradient(38% 46% at 68% 42%, var(--glow-b) 0%, transparent 72%);
-  filter: blur(18px);
-}
-
-/*
- * Everything that is not the field sits above the grain.
- *
- * Only z-index — this class must never set `position`, or it silently
- * overrides Tailwind's `sticky` on any element that carries both.
- */
-.layer {
-  z-index: 1;
-}
-
-/* Non-sticky containers still need a stacking context to clear the grain. */
-.layer:not(.sticky) {
-  position: relative;
-}
-
-/* Display type: tight, large, near-black — the reference's voice. */
-.display {
-  letter-spacing: -0.033em;
-  line-height: 1.04;
-  font-weight: 600;
-}
-
-.tnum {
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: "tnum" 1;
-}
-
-.eyebrow {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.11em;
-  text-transform: uppercase;
-  color: var(--ink-3);
-}
-
-/* The floating white panel. */
-.card {
-  background: var(--card);
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-card);
-  box-shadow: 0 1px 2px rgba(20, 30, 24, 0.04), 0 12px 32px -18px rgba(20, 40, 30, 0.18);
-}
-
-.rule {
-  border-top: 1px solid var(--rule);
-}
-
-a {
-  color: inherit;
-}
-
-:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-  border-radius: 3px;
+    radial-gradient(900px 620px at 68% 28%, rgba(34, 211, 238, 0.1), transparent 70%),
+    radial-gradient(700px 520px at 22% 78%, rgba(79, 70, 229, 0.11), transparent 72%);
 }
 
 .sr-only {
   position: absolute;
   width: 1px;
   height: 1px;
-  padding: 0;
   margin: -1px;
+  padding: 0;
   overflow: hidden;
-  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
   white-space: nowrap;
-  border-width: 0;
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+.eyebrow {
+  margin: 0;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+/* ---------- shell ---------- */
+
+.shell {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(320px, 380px) 1fr;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+/* ---------- metronome screen pulse ---------- */
+
+.pulse-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 260ms ease, box-shadow 260ms ease;
+  box-shadow: inset 0 0 0 0 transparent;
+}
+
+.phase-press .pulse-veil {
+  opacity: 1;
+  box-shadow: inset 0 0 180px 20px var(--pulse-glow, rgba(225, 29, 72, 0.5));
+}
+
+.phase-release .pulse-veil {
+  opacity: 1;
+  box-shadow: inset 0 0 90px 4px rgba(148, 178, 214, 0.05);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse-veil {
+    transition: none;
+  }
+}
+
+/* ---------- buttons ---------- */
+
+.btn-primary,
+.btn-ghost,
+.btn-icon {
+  font: inherit;
+  cursor: pointer;
+  border-radius: 999px;
+  transition: background 150ms ease, border-color 150ms ease, opacity 150ms ease;
+}
+
+.btn-primary {
+  border: 0;
+  background: linear-gradient(180deg, var(--accent), var(--accent-deep));
+  color: var(--accent-ink);
+  font-size: 13.5px;
+  font-weight: 650;
+  padding: 10px 16px;
+  white-space: nowrap;
+}
+
+.btn-primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.btn-primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-ghost {
+  border: 1px solid var(--glass-rule);
+  background: rgba(148, 178, 214, 0.06);
+  color: var(--ink-2);
+  font-size: 13px;
+  padding: 9px 14px;
+}
+
+.btn-ghost:hover {
+  background: rgba(148, 178, 214, 0.13);
+  color: var(--ink);
+}
+
+.btn-icon {
+  border: 1px solid var(--glass-rule);
+  background: transparent;
+  color: var(--ink-2);
+  width: 30px;
+  height: 30px;
+  line-height: 1;
+  flex: none;
+}
+
+.btn-icon:hover {
+  background: rgba(148, 178, 214, 0.12);
+  color: var(--ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ---------- chat ---------- */
+
+.chat {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid var(--glass-rule);
+  background: var(--panel);
+  backdrop-filter: blur(20px);
+}
+
+.chat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--glass-rule);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.brand-mark {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 10px;
+  background: radial-gradient(circle at 34% 30%, var(--accent), var(--accent-deep) 68%, #0b2b33);
+  box-shadow: 0 0 22px rgba(34, 211, 238, 0.45);
+}
+
+.brand-name {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 640;
+  letter-spacing: -0.012em;
+}
+
+.brand-sub {
+  margin: 1px 0 0;
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+
+.badge {
+  flex: none;
+  font-size: 10.5px;
+  font-weight: 640;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  padding: 5px 9px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  cursor: help;
+}
+
+.badge-live {
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: rgba(34, 211, 238, 0.32);
+}
+
+.badge-offline {
+  color: var(--ink-2);
+  background: rgba(148, 178, 214, 0.08);
+  border-color: var(--glass-rule);
+}
+
+.chat-log {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.bubble {
+  max-width: 100%;
+  padding: 11px 14px;
+  border-radius: 14px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.bubble p {
+  margin: 0;
+}
+
+.bubble.user {
+  align-self: flex-end;
+  background: linear-gradient(180deg, rgba(34, 211, 238, 0.2), rgba(34, 211, 238, 0.11));
+  border: 1px solid rgba(34, 211, 238, 0.3);
+  border-bottom-right-radius: 5px;
+}
+
+.bubble.assistant {
+  align-self: flex-start;
+  background: rgba(148, 178, 214, 0.07);
+  border: 1px solid var(--glass-rule);
+  border-bottom-left-radius: 5px;
+  color: var(--ink-2);
+}
+
+.bubble.scanning {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--accent);
+}
+
+.scan-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 14px;
+}
+
+.scan-bars i {
+  width: 3px;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--accent);
+  animation: scanbar 900ms ease-in-out infinite;
+}
+
+.scan-bars i:nth-child(2) {
+  animation-delay: 120ms;
+}
+.scan-bars i:nth-child(3) {
+  animation-delay: 240ms;
+}
+.scan-bars i:nth-child(4) {
+  animation-delay: 360ms;
+}
+
+@keyframes scanbar {
+  0%,
+  100% {
+    transform: scaleY(0.3);
+    opacity: 0.45;
+  }
+  50% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.chip {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px 5px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(34, 211, 238, 0.32);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.chip:hover {
+  background: rgba(34, 211, 238, 0.22);
+}
+
+.chip-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+}
+
+.examples {
+  padding: 0 20px 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.example {
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  color: var(--ink-2);
+  padding: 9px 12px;
+  border-radius: 11px;
+  border: 1px dashed var(--glass-rule);
+  background: transparent;
+}
+
+.example:hover {
+  color: var(--ink);
+  border-style: solid;
+  background: rgba(148, 178, 214, 0.07);
+}
+
+.composer {
+  display: flex;
+  gap: 8px;
+  padding: 14px 20px 8px;
+  border-top: 1px solid var(--glass-rule);
+}
+
+.composer-input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 14px;
+  color: var(--ink);
+  background: rgba(7, 11, 20, 0.6);
+  border: 1px solid var(--glass-rule);
+  border-radius: 999px;
+  padding: 10px 15px;
+}
+
+.composer-input::placeholder {
+  color: var(--ink-3);
+}
+
+.composer-input:focus {
+  border-color: rgba(34, 211, 238, 0.45);
+  outline: none;
+}
+
+.chat-foot {
+  margin: 0;
+  padding: 0 20px 16px;
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+/* ---------- stage ---------- */
+
+.stage {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+}
+
+.scene-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.scene-loading {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
+.stage-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  font-size: 11.5px;
+  color: var(--ink-3);
+  background: rgba(7, 11, 20, 0.62);
+  border: 1px solid var(--glass-rule);
+  border-radius: 999px;
+  padding: 6px 13px;
+  backdrop-filter: blur(8px);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.reset-view {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  backdrop-filter: blur(8px);
+}
+
+/* ---------- hotspots ---------- */
+
+.hotspot {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  transition: transform 140ms ease;
+}
+
+.hotspot:hover {
+  transform: scale(1.18);
+}
+
+.hotspot-core {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--dot, #e11d48);
+  /* A thin light collar keeps the deepest step legible against the clay body,
+     where a dark red alone would sink into the surface. */
+  box-shadow:
+    0 0 0 1.5px rgba(255, 255, 255, 0.75),
+    0 0 12px 3px var(--dot-glow, rgba(225, 29, 72, 0.7));
+}
+
+.hotspot-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  /* Ring weight is the redundant encoding of depth: thicker means deeper, so
+     the scale survives greyscale and colour-vision deficiency. */
+  border: var(--dot-ring, 2px) solid var(--dot, #e11d48);
+  opacity: 0;
+}
+
+.hotspot.is-active .hotspot-ring {
+  animation: ping 1.8s cubic-bezier(0.2, 0.6, 0.3, 1) infinite;
+}
+
+@keyframes ping {
+  0% {
+    transform: scale(0.35);
+    opacity: 0.85;
+  }
+  80%,
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+/* Unrecommended points stay visible but recede, so the library is discoverable
+   without competing with the answer. */
+.hotspot.is-dim .hotspot-core {
+  width: 8px;
+  height: 8px;
+  opacity: 0.72;
+  box-shadow: 0 0 0 1.25px rgba(255, 255, 255, 0.55);
+}
+
+.hotspot.is-dim:hover .hotspot-core {
+  opacity: 1;
+}
+
+.hotspot-tag {
+  position: absolute;
+  left: 21px;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  color: #fff;
+  text-shadow: 0 1px 6px rgba(7, 11, 20, 0.95);
+  opacity: 0;
+  transition: opacity 140ms ease;
+  pointer-events: none;
+}
+
+/* Depth named in text, so the ramp is never colour-only. */
+.hotspot-tag em {
+  font-style: normal;
+  font-size: 8.5px;
+  font-weight: 600;
+  color: var(--dot, #e11d48);
+}
+
+.hotspot.is-active .hotspot-tag,
+.hotspot:hover .hotspot-tag {
+  opacity: 1;
+}
+
+.hotspot.is-selected .hotspot-core {
+  width: 12px;
+  height: 12px;
+  box-shadow:
+    0 0 0 2.5px #fff,
+    0 0 18px 6px var(--dot-glow, rgba(225, 29, 72, 0.9));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hotspot.is-active .hotspot-ring {
+    animation: none;
+    opacity: 0.6;
+  }
+  .scan-bars i {
+    animation: none;
+  }
+}
+
+/* ---------- details panel ---------- */
+
+.details {
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 20;
+  width: min(392px, 100vw);
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: rgba(13, 19, 32, 0.86);
+  backdrop-filter: blur(26px) saturate(1.3);
+  border-left: 1px solid var(--glass-rule);
+  box-shadow: -28px 0 70px rgba(2, 4, 10, 0.6);
+}
+
+.details-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 20px;
+  border-bottom: 1px solid var(--glass-rule);
+}
+
+.details-name {
+  margin: 4px 0 0;
+  font-size: 25px;
+  font-weight: 640;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.details-translation {
+  margin: 3px 0 0;
+  font-size: 13px;
+  color: var(--accent);
+}
+
+.details-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 18px 20px 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.field p:last-child {
+  margin: 6px 0 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+
+.tags {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 0;
+}
+
+.tags li {
+  font-size: 11.5px;
+  color: var(--ink-2);
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--glass-rule);
+  background: rgba(148, 178, 214, 0.06);
+}
+
+.caution {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #fde3a7;
+  padding: 11px 13px;
+  border-radius: 12px;
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  background: rgba(251, 191, 36, 0.09);
+}
+
+.caution strong {
+  color: var(--warn);
+}
+
+.details-foot {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--ink-3);
+}
+
+/* ---------- metronome ---------- */
+
+.metronome {
+  border: 1px solid var(--glass-rule);
+  border-radius: var(--radius);
+  background: rgba(7, 11, 20, 0.45);
+  padding: 15px;
+}
+
+.metronome-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.metronome-clock {
+  margin: 2px 0 0;
+  font-size: 30px;
+  font-weight: 620;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+.metronome-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: stretch;
+}
+
+.metronome-track {
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(148, 178, 214, 0.14);
+  margin: 14px 0 11px;
+  overflow: hidden;
+}
+
+.metronome-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent-deep), var(--accent));
+  transition: width 120ms linear;
+}
+
+.metronome-cue {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-2);
+  transition: color 160ms ease, transform 160ms ease;
+}
+
+.metronome-cue.press {
+  color: var(--accent);
+  transform: scale(1.04);
+  transform-origin: left center;
+}
+
+.metronome-cue.release {
+  color: var(--ink-3);
+}
+
+.metronome-count {
+  margin: 4px 0 0;
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+
+/* ---------- narrow screens ---------- */
+
+@media (max-width: 900px) {
+  body {
+    overflow: auto;
+  }
+
+  .shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: 58vh auto;
+    height: auto;
+  }
+
+  .chat {
+    border-right: 0;
+    border-bottom: 1px solid var(--glass-rule);
+    order: 2;
+    min-height: 52vh;
+  }
+
+  .stage {
+    order: 1;
+    height: 58vh;
+  }
+
+  .details {
+    width: 100vw;
+  }
+}
+
+/* ---------- body switch & pressure legend ---------- */
+
+.body-switch {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  display: flex;
+  gap: 2px;
+  margin: 0;
+  padding: 3px;
+  border: 1px solid var(--glass-rule);
+  border-radius: 999px;
+  background: rgba(7, 11, 20, 0.62);
+  backdrop-filter: blur(8px);
+}
+
+.body-switch label {
+  position: relative;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-3);
+  padding: 6px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.body-switch label:hover {
+  color: var(--ink-2);
+}
+
+.body-switch label.is-on {
+  background: rgba(34, 211, 238, 0.16);
+  color: var(--accent);
+}
+
+/* The radio stays in the accessibility tree and keeps arrow-key behaviour;
+   only its default painting is removed. */
+.body-switch input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  margin: 0;
+  cursor: pointer;
+}
+
+.body-switch label:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.legend {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  padding: 10px 13px;
+  border: 1px solid var(--glass-rule);
+  border-radius: 13px;
+  background: rgba(7, 11, 20, 0.62);
+  backdrop-filter: blur(8px);
+  pointer-events: none;
+}
+
+.legend ul {
+  list-style: none;
+  margin: 7px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.legend li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+  color: var(--ink-2);
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.6);
+}
+
+/* ---------- pressure depth, in the details panel ---------- */
+
+.depth {
+  padding: 12px 13px;
+  border-radius: 13px;
+  border: 1px solid var(--glass-rule);
+  background: rgba(7, 11, 20, 0.45);
+}
+
+.depth-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.depth-head .eyebrow {
+  flex: 1;
+}
+
+.depth-head strong {
+  font-size: 13.5px;
+  font-weight: 680;
+  color: var(--dot);
+}
+
+.depth-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--dot);
+  box-shadow:
+    0 0 0 1.5px rgba(255, 255, 255, 0.7),
+    0 0 12px 3px var(--dot-glow);
+}
+
+.depth p {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+
+@media (max-width: 900px) {
+  .legend {
+    display: none;
+  }
 }
