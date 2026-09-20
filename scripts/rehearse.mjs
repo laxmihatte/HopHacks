@@ -2,6 +2,7 @@
 // demo is verified rather than assumed. Needs a Chromium binary:
 //   CHROME_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" npm run rehearse
 import { chromium } from "playwright-core";
+import { PNG } from "pngjs";
 
 const out = process.env.SHOT_DIR ?? "/tmp/acuguide";
 const exe = process.env.CHROME_PATH || undefined;
@@ -203,6 +204,50 @@ await page.mouse.up();
 await page.waitForTimeout(700);
 check("model still orbits by dragging", (await hotspots()).length > 0);
 await shot("7-orbited");
+
+// --- Click storm: the figure must survive being poked at ---
+// The camera rig and the orbit controls both write to the camera. When they
+// ran at the same time, a handful of clicks was enough to walk the camera off
+// the body and leave an empty stage. This measures actual body pixels.
+async function bodyPct() {
+  const png = PNG.sync.read(await page.locator(".stage").screenshot());
+  let clay = 0;
+  for (let i = 0; i < png.data.length; i += 4) {
+    const [r, g, b] = [png.data[i], png.data[i + 1], png.data[i + 2]];
+    if (r > 120 && r < 235 && g > 95 && g < 215 && b > 80 && b < 200 && r > b + 12) clay++;
+  }
+  return +((100 * clay) / (png.width * png.height)).toFixed(2);
+}
+
+await page.getByLabel("Describe your symptoms").fill("headache stiff neck nausea fatigue insomnia");
+await page.getByRole("button", { name: /Find points/i }).click();
+await page.waitForTimeout(3000);
+
+let worst = 100;
+for (let i = 0; i < 10; i++) {
+  const dots = page.locator(".hotspot");
+  const n = await dots.count();
+  for (let j = 0; j < n; j++) {
+    try {
+      await dots.nth((i * 3 + j) % n).click({ timeout: 800 });
+      break;
+    } catch {
+      /* occluded markers are not clickable, which is correct */
+    }
+  }
+  await page.waitForTimeout(1200);
+  worst = Math.min(worst, await bodyPct());
+}
+check(`the body survives 10 rapid clicks (worst ${worst}% of stage)`, worst > 3);
+await shot("9-click-storm");
+
+// Zooming out must not fade the figure into the fog.
+const stageBox = await page.locator(".stage").boundingBox();
+await page.mouse.move(stageBox.x + stageBox.width / 2, stageBox.y + stageBox.height / 2);
+for (let i = 0; i < 25; i++) await page.mouse.wheel(0, 240);
+await page.waitForTimeout(1000);
+const zoomedOut = await bodyPct();
+check(`the figure is still visible when zoomed fully out (${zoomedOut}%)`, zoomedOut > 2);
 
 check(`no page errors (${errors.length})`, errors.length === 0);
 if (errors.length) console.log("  errors:\n   - " + errors.slice(0, 6).join("\n   - "));

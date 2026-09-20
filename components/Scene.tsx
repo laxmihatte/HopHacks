@@ -2,7 +2,7 @@
 
 import { ContactShadows, OrbitControls } from "@react-three/drei";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { HEIGHT, type Vec3 } from "@/lib/anatomy";
 import { ACUPOINTS, POINT_IDS } from "@/lib/acupoints";
@@ -36,12 +36,18 @@ function desiredShot(point: Acupoint | null) {
   };
 }
 
+/** A flight that somehow fails to converge must still give the controls back. */
+const MAX_FLIGHT_MS = 2500;
+
 /**
- * Flies the camera to the focused point and hands control back to the user.
+ * Flies the camera to the focused point, then hands control back to the user.
  *
- * The tween is abandoned the moment the user touches the controls — an
- * auto-pan that fights a dragging hand is the single most common way a 3D demo
- * feels broken on stage.
+ * The controls are switched off for the duration of the flight. They have
+ * damping enabled, so a click that registers a pixel of drag leaves inertia
+ * running; with the rig lerping the same camera on the same frames, the two
+ * fight, and a few clicks are enough to walk the camera off the model
+ * entirely. Disabling the controls while flying makes exactly one thing own
+ * the camera at any moment.
  */
 function CameraRig({
   focus,
@@ -51,22 +57,25 @@ function CameraRig({
   controls: React.RefObject<OrbitControlsImpl | null>;
 }) {
   const flying = useRef(false);
+  const since = useRef(0);
   const goal = useRef(desiredShot(null));
+
+  const land = useCallback(() => {
+    flying.current = false;
+    const c = controls.current;
+    if (c) c.enabled = true;
+  }, [controls]);
 
   useEffect(() => {
     goal.current = desiredShot(focus);
     flying.current = true;
-  }, [focus]);
-
-  useEffect(() => {
+    since.current = performance.now();
     const c = controls.current;
-    if (!c) return;
-    const cancel = () => {
-      flying.current = false;
-    };
-    c.addEventListener("start", cancel);
-    return () => c.removeEventListener("start", cancel);
-  }, [controls]);
+    if (c) c.enabled = false;
+  }, [focus, controls]);
+
+  // If this component goes away mid-flight, the controls must not stay off.
+  useEffect(() => land, [land]);
 
   useFrame((state, delta) => {
     const c = controls.current;
@@ -81,11 +90,16 @@ function CameraRig({
     c.target.lerp(wantTarget, k);
     c.update();
 
-    if (
+    const arrived =
       state.camera.position.distanceTo(wantPos) < 0.004 &&
-      c.target.distanceTo(wantTarget) < 0.004
-    ) {
-      flying.current = false;
+      c.target.distanceTo(wantTarget) < 0.004;
+
+    if (arrived || performance.now() - since.current > MAX_FLIGHT_MS) {
+      // Snap the remainder so the rest position is exact, then hand back.
+      state.camera.position.copy(wantPos);
+      c.target.copy(wantTarget);
+      c.update();
+      land();
     }
   });
 
@@ -163,7 +177,7 @@ export default function Scene({
       className="scene-canvas"
     >
       <color attach="background" args={["#070b14"]} />
-      <fog attach="fog" args={["#070b14", 4.5, 11]} />
+      <fog attach="fog" args={["#070b14", 7, 16]} />
 
       <ambientLight intensity={0.7} />
       {/* Key */}
@@ -210,7 +224,7 @@ export default function Scene({
         enableDamping
         dampingFactor={0.09}
         minDistance={0.28}
-        maxDistance={5}
+        maxDistance={4}
         minPolarAngle={0.15}
         maxPolarAngle={Math.PI / 1.9}
       />

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import ChatPanel from "@/components/ChatPanel";
 import DetailsPanel from "@/components/DetailsPanel";
 import type { Phase } from "@/components/Metronome";
+import StageLoader from "@/components/StageLoader";
 import { ACUPOINTS } from "@/lib/acupoints";
 import { BUILD } from "@/lib/anatomy";
 import { PRESSURE, PRESSURE_ORDER, step } from "@/lib/pressure";
@@ -14,7 +15,7 @@ import type { ChatMessage, PointId, RouterSource, Sex } from "@/lib/types";
 // skeleton keeps the layout from jumping while the chunk loads.
 const Scene = dynamic(() => import("@/components/Scene"), {
   ssr: false,
-  loading: () => <div className="scene-loading">Preparing model…</div>,
+  loading: () => <StageLoader />,
 });
 
 /** The scan animation is the pitch's "AI magic" beat. A sub-200ms response
