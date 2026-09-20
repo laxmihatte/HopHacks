@@ -1,78 +1,124 @@
 @import "tailwindcss";
 
 /*
- * Roles, not raw hex. Series slots come from a validated categorical palette
- * (slot 1 blue, slot 2 orange); both modes are selected, not flipped.
+ * Ink on paper. Surfaces are warm and few; structure comes from hairline rules
+ * and whitespace rather than stacked cards. Series colours are unchanged —
+ * they are a validated categorical pair and are not a matter of taste.
  */
 :root {
   color-scheme: light;
-  --surface-0: #f7f7f5;
-  --surface-1: #fcfcfb;
-  --surface-2: #f0efec;
-  --border-1: #dcdbd5;
-  --border-2: #c8c7c0;
-  --text-primary: #0b0b0b;
-  --text-secondary: #52514e;
-  --text-muted: #77766f;
+
+  --paper: #fbfaf7;
+  --paper-sunk: #f3f1ea;
+  --ink: #1a1a18;
+  --ink-2: #55534b;
+  --ink-3: #85827a;
+  --rule: #e0dcd2;
+  --rule-strong: #c4c0b4;
+
+  --accent: #1c4f8f;
+  --accent-ink: #ffffff;
+
   --series-1: #2a78d6;
   --series-2: #eb6834;
-  --grid: #e6e5e0;
-  --warn-bg: #fdf4e3;
-  --warn-border: #e8cf95;
-  --warn-text: #5c4508;
+  --grid: #e9e5dc;
+
+  --flag-bg: #f7efdc;
+  --flag-rule: #ddc79a;
+  --flag-ink: #5b4610;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --surface-0: #121211;
-    --surface-1: #1a1a19;
-    --surface-2: #232322;
-    --border-1: #34342f;
-    --border-2: #45453f;
-    --text-primary: #ffffff;
-    --text-secondary: #c3c2b7;
-    --text-muted: #96958c;
+    --paper: #14140f;
+    --paper-sunk: #1d1c16;
+    --ink: #f6f4ec;
+    --ink-2: #b8b5a8;
+    --ink-3: #8a877c;
+    --rule: #32302a;
+    --rule-strong: #4a4740;
+    --accent: #7fb0f0;
+    --accent-ink: #14140f;
     --series-1: #3987e5;
     --series-2: #d95926;
-    --grid: #2b2b28;
-    --warn-bg: #2a2209;
-    --warn-border: #5c4a12;
-    --warn-text: #f0d79a;
+    --grid: #2a2823;
+    --flag-bg: #2a2209;
+    --flag-rule: #574616;
+    --flag-ink: #efd79c;
   }
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --surface-0: #121211;
-  --surface-1: #1a1a19;
-  --surface-2: #232322;
-  --border-1: #34342f;
-  --border-2: #45453f;
-  --text-primary: #ffffff;
-  --text-secondary: #c3c2b7;
-  --text-muted: #96958c;
+  --paper: #14140f;
+  --paper-sunk: #1d1c16;
+  --ink: #f6f4ec;
+  --ink-2: #b8b5a8;
+  --ink-3: #8a877c;
+  --rule: #32302a;
+  --rule-strong: #4a4740;
+  --accent: #7fb0f0;
+  --accent-ink: #14140f;
   --series-1: #3987e5;
   --series-2: #d95926;
-  --grid: #2b2b28;
-  --warn-bg: #2a2209;
-  --warn-border: #5c4a12;
-  --warn-text: #f0d79a;
+  --grid: #2a2823;
+  --flag-bg: #2a2209;
+  --flag-rule: #574616;
+  --flag-ink: #efd79c;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  background: var(--surface-0);
-  color: var(--text-primary);
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
-/* Tabular figures everywhere money appears, so columns line up. */
+/* Display face for headings and every figure that carries the answer. */
+.display {
+  font-family: var(--font-serif), Georgia, "Times New Roman", serif;
+  font-optical-sizing: auto;
+  letter-spacing: -0.012em;
+}
+
+/* Money and dates line up in columns. */
 .tnum {
   font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
 }
 
-/* Visually hidden, still announced. */
+/* The small letterspaced label that opens each section. */
+.eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+/* One hairline, used everywhere a box would otherwise appear. */
+.rule {
+  border-top: 1px solid var(--rule);
+}
+
+a {
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 1px;
+}
+
 .sr-only {
   position: absolute;
   width: 1px;

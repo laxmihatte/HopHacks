@@ -115,17 +115,21 @@ export default function CostChart({
   const boundaries = cycles
     .map((c, i) => ({ c, i }))
     .filter(({ c, i }) => c.planYearReset && i > 0)
-    .map(({ c, i }) => ({ at: (x(i - 1) + x(i)) / 2, year: c.planYear }));
+    .map(({ c, i }) => ({
+      at: (x(i - 1) + x(i)) / 2,
+      year: c.planYear,
+      on: c.resetOn,
+    }));
 
   const active = hover === null ? null : cycles[hover];
 
   return (
     <figure className="m-0">
-      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
-        <figcaption className="text-[15px] font-semibold text-[var(--text-primary)]">
+      <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
+        <figcaption className="display text-[19px] font-semibold text-[var(--ink)]">
           Cumulative out-of-pocket cost across treatment
         </figcaption>
-        <div className="flex items-center gap-4 text-xs text-[var(--text-secondary)]">
+        <div className="flex items-center gap-4 text-xs text-[var(--ink-2)]">
           <span className="flex items-center gap-1.5">
             <span
               className="inline-block h-[3px] w-4 rounded-full"
@@ -184,7 +188,7 @@ export default function CostChart({
                 y={y(v) + 4}
                 textAnchor="end"
                 fontSize={11}
-                fill="var(--text-muted)"
+                fill="var(--ink-3)"
                 className="tnum"
               >
                 {money(v)}
@@ -200,7 +204,7 @@ export default function CostChart({
                 x2={b.at}
                 y1={PAD.top - 6}
                 y2={PAD.top + plotH}
-                stroke="var(--text-secondary)"
+                stroke="var(--ink-2)"
                 strokeWidth={1.5}
                 strokeDasharray="5 4"
               />
@@ -210,9 +214,9 @@ export default function CostChart({
                 textAnchor={b.at < PAD.left + plotW / 3 ? "start" : "end"}
                 fontSize={11}
                 fontWeight={600}
-                fill="var(--text-secondary)"
+                fill="var(--ink-2)"
               >
-                Jan 1, {b.year} — plan year resets
+                {b.on ? shortDate(b.on) : ""}, {b.year} — plan year restarts
               </text>
             </g>
           ))}
@@ -223,7 +227,7 @@ export default function CostChart({
             x2={PAD.left + plotW}
             y1={PAD.top + plotH}
             y2={PAD.top + plotH}
-            stroke="var(--border-2)"
+            stroke="var(--rule-strong)"
             strokeWidth={1}
           />
           {cycles.map((c, i) =>
@@ -235,7 +239,7 @@ export default function CostChart({
                 y={PAD.top + plotH + 18}
                 textAnchor="middle"
                 fontSize={11}
-                fill="var(--text-muted)"
+                fill="var(--ink-3)"
               >
                 {shortDate(c.date)}
               </text>
@@ -246,7 +250,7 @@ export default function CostChart({
             y={H - 6}
             textAnchor="middle"
             fontSize={11}
-            fill="var(--text-muted)"
+            fill="var(--ink-3)"
           >
             Treatment cycle date
           </text>
@@ -258,7 +262,7 @@ export default function CostChart({
               x2={x(hover)}
               y1={PAD.top}
               y2={PAD.top + plotH}
-              stroke="var(--border-2)"
+              stroke="var(--rule-strong)"
               strokeWidth={1}
             />
           )}
@@ -272,7 +276,7 @@ export default function CostChart({
           <path d={beforePath} fill="none" stroke="var(--series-1)" strokeWidth={2} />
           {hasAid && (
             <>
-              <path d={afterPath} fill="none" stroke="var(--surface-1)" strokeWidth={4} />
+              <path d={afterPath} fill="none" stroke="var(--paper)" strokeWidth={4} />
               <path d={afterPath} fill="none" stroke="var(--series-2)" strokeWidth={2} />
             </>
           )}
@@ -285,7 +289,7 @@ export default function CostChart({
                 cy={y(cycles[hover].cumulativePatientPays)}
                 r={5}
                 fill="var(--series-1)"
-                stroke="var(--surface-1)"
+                stroke="var(--paper)"
                 strokeWidth={2}
               />
               {hasAid && (
@@ -294,7 +298,7 @@ export default function CostChart({
                   cy={y(afterAidCumulative[hover])}
                   r={5}
                   fill="var(--series-2)"
-                  stroke="var(--surface-1)"
+                  stroke="var(--paper)"
                   strokeWidth={2}
                 />
               )}
@@ -309,7 +313,7 @@ export default function CostChart({
               y={l.y + 4}
               fontSize={11}
               fontWeight={600}
-              fill="var(--text-primary)"
+              fill="var(--ink)"
               className="tnum"
             >
               {l.text}
@@ -319,40 +323,40 @@ export default function CostChart({
 
         {active && (
           <div
-            className="pointer-events-none absolute z-10 min-w-44 rounded-lg border border-[var(--border-1)] bg-[var(--surface-1)] p-2.5 text-xs shadow-lg"
+            className="pointer-events-none absolute z-10 min-w-44 border border-[var(--rule-strong)] bg-[var(--paper)] p-2.5 text-xs shadow-sm"
             style={{
               left: `${(x(hover!) / W) * 100}%`,
               top: "17%",
               transform: hover! > cycles.length / 2 ? "translateX(-108%)" : "translateX(8px)",
             }}
           >
-            <div className="mb-1.5 font-semibold text-[var(--text-primary)]">
+            <div className="mb-1.5 font-semibold text-[var(--ink)]">
               Cycle {active.index} · {shortDate(active.date)}
               {active.planYearReset && (
-                <span className="ml-1 font-normal text-[var(--text-secondary)]">
+                <span className="ml-1 font-normal text-[var(--ink-2)]">
                   (new plan year)
                 </span>
               )}
             </div>
-            <dl className="space-y-1 text-[var(--text-secondary)]">
+            <dl className="space-y-1 text-[var(--ink-2)]">
               <div className="flex justify-between gap-4">
                 <dt>Billed this cycle</dt>
-                <dd className="tnum text-[var(--text-primary)]">{moneyExact(active.grossCost)}</dd>
+                <dd className="tnum text-[var(--ink)]">{moneyExact(active.grossCost)}</dd>
               </div>
               <div className="flex justify-between gap-4">
                 <dt>Patient pays</dt>
-                <dd className="tnum text-[var(--text-primary)]">{moneyExact(active.patientPays)}</dd>
+                <dd className="tnum text-[var(--ink)]">{moneyExact(active.patientPays)}</dd>
               </div>
               <div className="flex justify-between gap-4">
                 <dt>Cumulative, before aid</dt>
-                <dd className="tnum text-[var(--text-primary)]">
+                <dd className="tnum text-[var(--ink)]">
                   {moneyExact(active.cumulativePatientPays)}
                 </dd>
               </div>
               {hasAid && (
                 <div className="flex justify-between gap-4">
                   <dt>Cumulative, after aid</dt>
-                  <dd className="tnum text-[var(--text-primary)]">
+                  <dd className="tnum text-[var(--ink)]">
                     {moneyExact(afterAidCumulative[hover!])}
                   </dd>
                 </div>

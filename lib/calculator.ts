@@ -66,9 +66,31 @@ export function grossCostForCycle(regimen: Regimen, cycleIndex: number): number 
   return round2(total);
 }
 
-/** The plan year a date falls in. The plan year is assumed to start January 1. */
-export function planYearOf(iso: string): number {
-  return new Date(parseIsoUtc(iso)).getUTCFullYear();
+/**
+ * The plan year a date falls in, given a boundary of "MM-DD".
+ *
+ * The plan year is labelled by the calendar year its boundary falls in: with a
+ * July 1 boundary, 2026-08-01 is in plan year 2026 and 2026-03-01 is still in
+ * plan year 2025.
+ */
+export function planYearOf(iso: string, planYearStart = "01-01"): number {
+  const [bm, bd] = planYearStart.split("-").map(Number);
+  const t = parseIsoUtc(iso);
+  const d = new Date(t);
+  const y = d.getUTCFullYear();
+  const boundary = new Date(0);
+  boundary.setUTCFullYear(y, bm - 1, bd);
+  boundary.setUTCHours(0, 0, 0, 0);
+  return t >= boundary.getTime() ? y : y - 1;
+}
+
+/** The ISO date on which the given plan year begins. */
+export function planYearBoundary(planYear: number, planYearStart = "01-01"): string {
+  const [bm, bd] = planYearStart.split("-").map(Number);
+  const d = new Date(0);
+  d.setUTCFullYear(planYear, bm - 1, bd);
+  d.setUTCHours(0, 0, 0, 0);
+  return toIsoUtc(d.getTime());
 }
 
 /**
@@ -85,20 +107,22 @@ export function estimate(input: EstimateInput, regimen: Regimen): Estimate {
   }
 
   const dates = cycleDates(input.startDate, regimen.cycleCount, regimen.cycleLengthDays);
+  const boundary = input.planYearStart ?? "01-01";
 
   let deductibleRemaining = input.deductible;
   let accrued = 0;
-  let previousPlanYear = planYearOf(dates[0]);
+  let previousPlanYear = planYearOf(dates[0], boundary);
 
   let totalGross = 0;
   const cycles: CycleResult[] = [];
 
   for (let i = 0; i < dates.length; i++) {
     const date = dates[i];
-    const planYear = planYearOf(date);
+    const planYear = planYearOf(date, boundary);
 
     // Plan-year reset. Four lines, inside the same loop as everything else.
     const planYearReset = planYear > previousPlanYear;
+    const resetOn = planYearReset ? planYearBoundary(planYear, boundary) : null;
     if (planYearReset) {
       deductibleRemaining = input.deductible;
       accrued = 0;
@@ -129,6 +153,7 @@ export function estimate(input: EstimateInput, regimen: Regimen): Estimate {
       date,
       planYear,
       planYearReset,
+      resetOn,
       grossCost,
       deductibleApplied,
       coinsuranceApplied,

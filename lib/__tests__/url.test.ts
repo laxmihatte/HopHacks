@@ -12,6 +12,8 @@ const form: FormState = {
   regimenId: "tchp",
   startDate: "2026-10-15",
   insuranceType: "commercial",
+  coverage: "employer-calendar",
+  planYearStart: "01-01",
   deductible: "3000",
   coinsurancePercent: "20",
   oopMax: "9000",

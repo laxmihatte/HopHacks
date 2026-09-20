@@ -19,6 +19,7 @@ const tchp = (regimenData as Regimen[]).find((r) => r.id === "tchp")!;
 
 const valid = {
   startDate: "2026-10-15",
+  planYearStart: "01-01",
   deductible: "3000",
   coinsurancePercent: "20",
   oopMax: "9000",
@@ -35,6 +36,7 @@ const input: EstimateInput = {
   householdSize: 4,
   income: 85000,
   insuranceType: "commercial",
+  planYearStart: "01-01",
 };
 
 describe("date parsing rejects dates that used to be silently rewritten", () => {

@@ -28,6 +28,7 @@ const base: EstimateInput = {
   householdSize: 4,
   income: 85000,
   insuranceType: "commercial",
+  planYearStart: "01-01",
 };
 
 describe("T1 — deductible, coinsurance, and the out-of-pocket cap", () => {

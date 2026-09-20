@@ -18,6 +18,8 @@ const KEYS = {
   regimenId: "reg",
   startDate: "start",
   insuranceType: "ins",
+  coverage: "cov",
+  planYearStart: "py",
   deductible: "ded",
   coinsurancePercent: "coins",
   oopMax: "oop",

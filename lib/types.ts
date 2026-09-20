@@ -68,6 +68,15 @@ export interface EstimateInput {
   deductible: number;
   /** Fraction, not percent: 0.2 for 20%. */
   coinsuranceRate: number;
+  /**
+   * The month and day the plan year restarts, as "MM-DD".
+   *
+   * Almost every tool assumes January 1. That is right for Medicare and for
+   * individual marketplace plans, but an employer-sponsored plan follows the
+   * employer's benefit year, which is frequently July 1, October 1, or the
+   * employer's fiscal year start.
+   */
+  planYearStart: string;
   oopMax: number;
   householdSize: number;
   income: number;
@@ -82,6 +91,8 @@ export interface CycleResult {
   planYear: number;
   /** True when the accumulators were zeroed before this cycle was applied. */
   planYearReset: boolean;
+  /** ISO date of the plan-year boundary that caused the reset, else null. */
+  resetOn: string | null;
   grossCost: number;
   deductibleApplied: number;
   coinsuranceApplied: number;
@@ -115,9 +126,48 @@ export interface FormState {
   regimenId: string;
   startDate: string;
   insuranceType: InsuranceType;
+  /** Which plan-year profile the user picked; drives guidance, not the maths. */
+  coverage: string;
+  /** "MM-DD" — the boundary the engine actually uses. */
+  planYearStart: string;
   deductible: string;
   coinsurancePercent: string;
   oopMax: string;
   householdSize: string;
   income: string;
+}
+
+/** One candidate start date, priced end to end. */
+export interface StartDateOption {
+  startDate: string;
+  totalGross: number;
+  totalPatientPays: number;
+  totalAfterAid: number;
+  /** How many times the deductible is charged over the course. */
+  deductiblesCharged: number;
+  /** Plan-year boundaries the course of treatment crosses. */
+  boundariesCrossed: number;
+}
+
+export interface StartDateSweep {
+  options: StartDateOption[];
+  cheapest: StartDateOption;
+  costliest: StartDateOption;
+  /** What choosing the cheapest date saves against the costliest. */
+  spread: number;
+  /** The date the user originally entered, priced the same way. */
+  chosen: StartDateOption | null;
+  /** What moving from the chosen date to the cheapest one saves. */
+  savingsVsChosen: number;
+}
+
+/** What a coverage type typically implies about the plan-year boundary. */
+export interface PlanYearProfile {
+  id: string;
+  label: string;
+  /** "MM-DD" when the boundary is reliably known, else null. */
+  typicalStart: string | null;
+  confidence: "regulated" | "common" | "varies";
+  note: string;
+  whereToCheck: string;
 }

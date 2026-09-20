@@ -7,6 +7,9 @@ const ctx = await b.newContext({ viewport: { width: 1180, height: 1000 } });
 const p = await ctx.newPage();
 const fail = [];
 
+const countErrors = () => p.evaluate(() =>
+  [...document.querySelectorAll('[role="alert"]')].filter(e => e.textContent.trim()).length);
+
 async function run(label) {
   await p.getByRole('button', { name: /Estimate my cost/i }).click();
   await p.waitForTimeout(300);
@@ -70,9 +73,7 @@ await p.fill('input[type="number"] >> nth=0', '-999');
 await p.fill('input[type="number"] >> nth=4', '85500');
 await p.selectOption('select >> nth=0', 'colorectal-cancer');
 await p.waitForTimeout(250);
-const erroredBefore = await p.locator('[role="alert"]').count();
-console.log('   DEBUG before:', JSON.stringify(await p.evaluate(() =>
-  [...document.querySelectorAll('[role="alert"]')].map(e => e.textContent.trim().slice(0,60)))));
+const erroredBefore = await countErrors();
 const enabledAfterEdit = !(await resetBtn.isDisabled());
 await resetBtn.click();
 await p.waitForTimeout(400);
@@ -82,10 +83,7 @@ const restored = {
   dx: await p.locator('select').nth(0).inputValue(),
   date: await p.locator('input[type="date"]').inputValue(),
 };
-const alertsAfter = await p.locator('[role="alert"]').count();
-console.log('   DEBUG after:', JSON.stringify(await p.evaluate(() =>
-  [...document.querySelectorAll('[role="alert"]')].map(e => e.textContent.trim().slice(0,60)))));
-console.log('   DEBUG url:', p.url());
+const alertsAfter = await countErrors();
 console.log(`Regression — Reset: disabled at defaults=${disabledAtDefaults}, enabled after edit=${enabledAfterEdit}, errors ${erroredBefore}->${alertsAfter}, restored=${JSON.stringify(restored)}`);
 if (!disabledAtDefaults) fail.push('Reset was enabled on a freshly loaded form');
 if (!enabledAfterEdit) fail.push('Reset stayed disabled after editing a field');

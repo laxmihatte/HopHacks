@@ -8,8 +8,21 @@ export const MIN_YEAR = 1900;
 export const MAX_YEAR = 2100;
 export const MAX_HOUSEHOLD = 12;
 
+/** "MM-DD" for a real calendar month/day, ignoring the year. */
+export function isValidMonthDay(md: string): boolean {
+  const m = /^(\d{2})-(\d{2})$/.exec(md);
+  if (!m) return false;
+  const mo = Number(m[1]);
+  const d = Number(m[2]);
+  if (mo < 1 || mo > 12 || d < 1) return false;
+  // Use a leap year so Feb 29 is allowed as a boundary.
+  const days = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][mo - 1];
+  return d <= days;
+}
+
 export type FieldKey =
   | "startDate"
+  | "planYearStart"
   | "deductible"
   | "coinsurancePercent"
   | "oopMax"
@@ -53,6 +66,7 @@ export function isValidIsoDate(iso: string): boolean {
 
 export interface RawForm {
   startDate: string;
+  planYearStart: string;
   deductible: string;
   coinsurancePercent: string;
   oopMax: string;
@@ -66,6 +80,10 @@ export function validateForm(form: RawForm): FieldErrors {
 
   if (!isValidIsoDate(form.startDate)) {
     errors.startDate = `Enter a real date between ${MIN_YEAR} and ${MAX_YEAR}.`;
+  }
+
+  if (!isValidMonthDay(form.planYearStart)) {
+    errors.planYearStart = "Enter a real month and day for the plan year.";
   }
 
   const deductible = parseField(form.deductible);
@@ -115,6 +133,9 @@ export function assertValidEstimateInput(input: EstimateInput): void {
     throw new InvalidInputError(m);
   };
   if (!isValidIsoDate(input.startDate)) fail(`Invalid start date: "${input.startDate}"`);
+  if (!isValidMonthDay(input.planYearStart ?? "01-01")) {
+    fail(`Invalid plan-year start: "${input.planYearStart}"`);
+  }
   if (!Number.isFinite(input.deductible) || input.deductible < 0) {
     fail(`Invalid deductible: ${input.deductible}`);
   }

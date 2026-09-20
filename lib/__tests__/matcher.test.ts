@@ -71,8 +71,8 @@ describe("eligibility predicate", () => {
 describe("aid application never overstates relief", () => {
   const fake: Estimate = {
     cycles: [
-      { index: 1, date: "2026-10-15", planYear: 2026, planYearReset: false, grossCost: 0, deductibleApplied: 0, coinsuranceApplied: 0, patientPays: 4000, cumulativePatientPays: 4000 },
-      { index: 2, date: "2026-11-05", planYear: 2026, planYearReset: false, grossCost: 0, deductibleApplied: 0, coinsuranceApplied: 0, patientPays: 5000, cumulativePatientPays: 9000 },
+      { index: 1, date: "2026-10-15", planYear: 2026, planYearReset: false, resetOn: null, grossCost: 0, deductibleApplied: 0, coinsuranceApplied: 0, patientPays: 4000, cumulativePatientPays: 4000 },
+      { index: 2, date: "2026-11-05", planYear: 2026, planYearReset: false, resetOn: null, grossCost: 0, deductibleApplied: 0, coinsuranceApplied: 0, patientPays: 5000, cumulativePatientPays: 9000 },
     ],
     totalGross: 0,
     totalPatientPays: 9000,
@@ -112,6 +112,7 @@ describe("end to end on the demo input", () => {
     householdSize: 4,
     income: 85000,
     insuranceType: "commercial",
+    planYearStart: "01-01",
   };
 
   it("produces a gap between the before-aid and after-aid totals", () => {
